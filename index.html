@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>قمة الأسهم</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
+<style>
+/* ===== CSS VARIABLES ===== */
+:root {
+  --navy: #0f1b2d;
+  --navy-light: #1a2d47;
+  --navy-dark: #0a1220;
+  --gold: #c8922a;
+  --gold-light: #e0b85c;
+  --gold-dim: rgba(200,146,42,0.15);
+  --green: #00c853;
+  --green-bg: rgba(0,200,83,0.1);
+  --red: #ff1744;
+  --red-bg: rgba(255,23,68,0.1);
+  --gray: #8899aa;
+  --gray-light: #c5d0db;
+  --bg: #f4f5f7;
+  --card: #ffffff;
+  --card-border: #e8ecf0;
+  --text: #1a2332;
+  --text-secondary: #5a6a7a;
+  --font: 'Tajawal', sans-serif;
+  --radius: 14px;
+  --radius-sm: 8px;
+  --shadow: 0 2px 12px rgba(15,27,45,0.06);
+  --shadow-lg: 0 8px 32px rgba(15,27,45,0.1);
+  --nav-height: 64px;
+  --header-height: 56px;
+}
+
+/* ===== RESET ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+  overflow-x: hidden;
+  padding-bottom: calc(var(--nav-height) + 16px);
+  padding-top: var(--header-height);
+}
+button { font-family: var(--font); cursor: pointer; border: none; background: none; }
+input, select { font-family: var(--font); }
+
+/* ===== HEADER ===== */
+.app-header {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: var(--header-height);
+  background: var(--navy);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 16px;
+  z-index: 100;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.2);
+}
+.app-header .logo {
+  display: flex; align-items: center; gap: 8px;
+  color: var(--gold); font-weight: 800; font-size: 18px;
+}
+.app-header .logo svg { width: 28px; height: 28px; }
+.app-header .tasi-mini {
+  display: flex; align-items: center; gap: 8px;
+  color: #fff; font-size: 13px; font-weight: 500;
+}
+.app-header .tasi-mini .val { font-weight: 700; font-size: 15px; }
+.app-header .tasi-mini .chg { font-size: 12px; padding: 2px 6px; border-radius: 4px; font-weight: 700; }
+.app-header .tasi-mini .chg.up { background: var(--green-bg); color: var(--green); }
+.app-header .tasi-mini .chg.down { background: var(--red-bg); color: var(--red); }
+.header-status {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 10px; color: var(--gray); font-weight: 500;
+}
+.status-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  display: inline-block;
+}
+.status-dot.open { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.status-dot.closed { background: var(--red); }
+
+/* ===== BOTTOM NAV ===== */
+.bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  height: var(--nav-height);
+  background: var(--card);
+  border-top: 1px solid var(--card-border);
+  display: flex; align-items: center; justify-content: space-around;
+  z-index: 100;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  box-shadow: 0 -2px 16px rgba(0,0,0,0.04);
+}
+.nav-item {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  font-size: 10px; font-weight: 500; color: var(--gray);
+  padding: 6px 0;
+  transition: color 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.nav-item.active { color: var(--gold); }
+.nav-item svg { width: 22px; height: 22px; stroke-width: 1.75; }
+
+/* ===== PAGES ===== */
+.page { display: none; padding: 12px; }
+.page.active { display: block; }
+
+/* ===== CARDS ===== */
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  border: 1px solid var(--card-border);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+/* ===== QUICK CARDS (horizontal scroll) ===== */
+.quick-cards {
+  display: flex; gap: 10px;
+  overflow-x: auto; scroll-snap-type: x mandatory;
+  padding: 4px 2px 12px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.quick-cards::-webkit-scrollbar { display: none; }
+.quick-card {
+  scroll-snap-align: start;
+  min-width: 140px; flex-shrink: 0;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.quick-card .qc-title {
+  font-size: 11px; color: var(--text-secondary); font-weight: 500;
+  display: flex; align-items: center; gap: 4px;
+}
+.quick-card .qc-name { font-size: 13px; font-weight: 700; }
+.quick-card .qc-price { font-size: 15px; font-weight: 800; }
+.quick-card .qc-change { font-size: 12px; font-weight: 700; }
+
+/* ===== SEARCH BAR ===== */
+.search-bar {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  margin-bottom: 10px;
+}
+.search-bar svg { width: 18px; height: 18px; color: var(--gray); flex-shrink: 0; }
+.search-bar input {
+  flex: 1; border: none; outline: none;
+  font-size: 14px; background: transparent;
+  color: var(--text);
+}
+.search-bar input::placeholder { color: var(--gray-light); }
+
+/* ===== SECTOR CHIPS ===== */
+.sector-chips {
+  display: flex; gap: 6px; overflow-x: auto;
+  padding: 0 0 10px; scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.sector-chips::-webkit-scrollbar { display: none; }
+.sector-chip {
+  white-space: nowrap; padding: 5px 12px;
+  border-radius: 20px; font-size: 12px; font-weight: 500;
+  border: 1px solid var(--card-border);
+  background: var(--card); color: var(--text-secondary);
+  transition: all 0.2s;
+}
+.sector-chip.active {
+  background: var(--navy); color: #fff;
+  border-color: var(--navy);
+}
+
+/* ===== STOCK TABLE ===== */
+.stock-table { width: 100%; overflow-x: auto; }
+.stock-table table {
+  width: 100%; border-collapse: collapse;
+  font-size: 13px;
+}
+.stock-table th {
+  position: sticky; top: 0;
+  background: var(--bg); color: var(--text-secondary);
+  font-weight: 600; font-size: 11px;
+  padding: 8px 6px; text-align: right;
+  border-bottom: 2px solid var(--card-border);
+  cursor: pointer; user-select: none;
+  white-space: nowrap;
+}
+.stock-table th:hover { color: var(--gold); }
+.stock-table th .sort-icon { font-size: 10px; margin-right: 2px; }
+.stock-table td {
+  padding: 10px 6px; text-align: right;
+  border-bottom: 1px solid var(--card-border);
+  white-space: nowrap;
+}
+.stock-table tr { transition: background 0.15s; }
+.stock-table tbody tr:active { background: var(--gold-dim); }
+.stock-name {
+  display: flex; flex-direction: column;
+}
+.stock-name .sn-name { font-weight: 700; font-size: 13px; }
+.stock-name .sn-symbol { font-size: 11px; color: var(--gray); }
+.td-up { color: var(--green); font-weight: 700; }
+.td-down { color: var(--red); font-weight: 700; }
+.td-flat { color: var(--gray); }
+
+/* ===== SECTION TITLE ===== */
+.section-title {
+  font-size: 15px; font-weight: 700;
+  margin: 16px 0 8px; color: var(--text);
+  display: flex; align-items: center; gap: 6px;
+}
+.section-title svg { width: 18px; height: 18px; color: var(--gold); }
+
+/* ===== LOADING ===== */
+.loading {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 60px 20px; gap: 12px;
+  color: var(--text-secondary); font-size: 14px;
+}
+.spinner {
+  width: 36px; height: 36px;
+  border: 3px solid var(--card-border);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ===== EMPTY STATE ===== */
+.empty-state {
+  text-align: center; padding: 40px 20px;
+  color: var(--text-secondary); font-size: 14px;
+}
+
+/* ===== MARKET SUMMARY STRIP ===== */
+.market-strip {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  margin-bottom: 12px;
+}
+.ms-box {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  padding: 10px; text-align: center;
+}
+.ms-box .ms-label { font-size: 10px; color: var(--text-secondary); font-weight: 500; }
+.ms-box .ms-val { font-size: 16px; font-weight: 800; margin-top: 2px; }
+.ms-box .ms-sub { font-size: 11px; font-weight: 600; margin-top: 2px; }
+
+/* ===== COMING SOON PAGE ===== */
+.coming-soon {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 80px 20px; gap: 16px; text-align: center;
+}
+.coming-soon svg { width: 64px; height: 64px; color: var(--gold-light); }
+.coming-soon h2 { font-size: 20px; color: var(--text); }
+.coming-soon p { font-size: 14px; color: var(--text-secondary); max-width: 280px; }
+
+/* ===== REFRESH BTN ===== */
+.refresh-btn {
+  display: flex; align-items: center; gap: 4px;
+  background: var(--gold-dim); color: var(--gold);
+  padding: 6px 12px; border-radius: 20px;
+  font-size: 12px; font-weight: 600;
+}
+.refresh-btn svg { width: 14px; height: 14px; }
+
+/* ===== UTILITIES ===== */
+.flex-between { display: flex; align-items: center; justify-content: space-between; }
+.text-green { color: var(--green); }
+.text-red { color: var(--red); }
+.text-gold { color: var(--gold); }
+.fw700 { font-weight: 700; }
+
+</style>
+</head>
+<body>
+
+<!-- ===== ROOT ===== -->
+<div id="root"></div>
+
+<!-- ===== REACT + BABEL ===== -->
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel">
+// ============================================================
+//  قمة الأسهم — المرحلة الأولى
+//  API: SAHMK (sahmk.sa)
+// ============================================================
+
+const { useState, useEffect, useCallback, useMemo, useRef } = React;
+
+// ─── CONFIG ─────────────────────────────────────────────────
+const API_KEY = 'shmk_live_243cd1b92526f7cc5a4dfcb253bbe76b99286c7741741c21';
+const API_BASE = 'https://api.sahmk.sa/api/v1';
+
+// ─── API LAYER ──────────────────────────────────────────────
+const StockAPI = {
+  _cache: {},
+  _cacheTime: {},
+  _ttl: 5 * 60 * 1000, // 5 min cache
+
+  async _fetch(endpoint) {
+    const now = Date.now();
+    if (this._cache[endpoint] && (now - this._cacheTime[endpoint]) < this._ttl) {
+      return this._cache[endpoint];
+    }
+    try {
+      const res = await fetch(`${API_BASE}${endpoint}`, {
+        headers: { 'X-API-Key': API_KEY }
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error?.message || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      this._cache[endpoint] = data;
+      this._cacheTime[endpoint] = now;
+      return data;
+    } catch (e) {
+      console.error('API Error:', endpoint, e);
+      throw e;
+    }
+  },
+
+  // ملخص السوق
+  marketSummary(index = 'TASI') {
+    return this._fetch(`/market/summary/?index=${index}`);
+  },
+
+  // الرابحون
+  gainers(limit = 5, index = 'TASI') {
+    return this._fetch(`/market/gainers/?limit=${limit}&index=${index}`);
+  },
+
+  // الخاسرون
+  losers(limit = 5, index = 'TASI') {
+    return this._fetch(`/market/losers/?limit=${limit}&index=${index}`);
+  },
+
+  // الأكثر نشاطاً بالحجم
+  topVolume(limit = 5, index = 'TASI') {
+    return this._fetch(`/market/volume/?limit=${limit}&index=${index}`);
+  },
+
+  // الأكثر نشاطاً بالقيمة
+  topValue(limit = 5, index = 'TASI') {
+    return this._fetch(`/market/value/?limit=${limit}&index=${index}`);
+  },
+
+  // القطاعات
+  sectors(index = 'TASI') {
+    return this._fetch(`/market/sectors/?index=${index}`);
+  },
+
+  // سعر سهم واحد
+  quote(symbol) {
+    return this._fetch(`/quote/${symbol}/`);
+  },
+
+  // قائمة الشركات
+  companies(search = '', market = 'TASI', limit = 100, offset = 0) {
+    let url = `/companies/?market=${market}&limit=${limit}&offset=${offset}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    return this._fetch(url);
+  },
+
+  // مسح الكاش
+  clearCache() {
+    this._cache = {};
+    this._cacheTime = {};
+  }
+};
+
+// ─── SVG ICONS ──────────────────────────────────────────────
+const Icons = {
+  market: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 5-5"/></svg>,
+  filter: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"><path d="M3 4h18"/><path d="M7 8h10"/><path d="M10 12h4"/><path d="M3 16l4-4 4 4 5-5"/><circle cx="19" cy="11" r="2"/></svg>,
+  chart: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M7 15l3-3 3 3 4-4"/></svg>,
+  signal: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"><path d="M2 20h20"/><rect x="4" y="14" width="3" height="6" rx="1"/><rect x="10.5" y="8" width="3" height="12" rx="1"/><rect x="17" y="4" width="3" height="16" rx="1"/></svg>,
+  user: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M5 20c0-4 3.5-7 7-7s7 3 7 7"/></svg>,
+  search: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>,
+  refresh: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>,
+  trending: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"><path d="M22 7l-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/></svg>,
+  trendDown: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"><path d="M22 17l-8.5-8.5-5 5L2 7"/><path d="M16 17h6v-6"/></svg>,
+  volume: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="10" width="4" height="10" rx="1"/><rect x="10" y="4" width="4" height="16" rx="1"/><rect x="16" y="8" width="4" height="12" rx="1"/></svg>,
+  logo: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>,
+  construct: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 12h.01"/><path d="M17 12h.01"/><path d="M7 12h.01"/></svg>,
+};
+
+// ─── FORMAT HELPERS ─────────────────────────────────────────
+function fmtNum(n, dec = 2) {
+  if (n == null || isNaN(n)) return '—';
+  return Number(n).toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+function fmtVol(n) {
+  if (n == null) return '—';
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(0) + 'K';
+  return n.toString();
+}
+function chgClass(v) {
+  if (v > 0) return 'td-up';
+  if (v < 0) return 'td-down';
+  return 'td-flat';
+}
+function chgSign(v) {
+  if (v > 0) return '+';
+  return '';
+}
+function isMarketOpen() {
+  const now = new Date();
+  const ksa = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Riyadh' }));
+  const day = ksa.getDay(); // 0=Sun
+  const h = ksa.getHours();
+  const m = ksa.getMinutes();
+  const mins = h * 60 + m;
+  // السوق: أحد-خميس 10:00-15:00 (تداول مستمر)
+  return day >= 0 && day <= 4 && mins >= 600 && mins <= 900;
+}
+
+// ─── HEADER COMPONENT ───────────────────────────────────────
+function AppHeader({ tasi }) {
+  const open = isMarketOpen();
+  return (
+    <header className="app-header">
+      <div className="logo">
+        {Icons.logo}
+        <span>قمة الأسهم</span>
+      </div>
+      {tasi ? (
+        <div className="tasi-mini">
+          <span>تاسي</span>
+          <span className="val">{fmtNum(tasi.index_value, 0)}</span>
+          <span className={`chg ${tasi.index_change_percent >= 0 ? 'up' : 'down'}`}>
+            {chgSign(tasi.index_change_percent)}{fmtNum(tasi.index_change_percent, 2)}%
+          </span>
+        </div>
+      ) : (
+        <div className="tasi-mini"><span style={{color:'var(--gray)'}}>جاري التحميل...</span></div>
+      )}
+      <div className="header-status">
+        <span className={`status-dot ${open ? 'open' : 'closed'}`}></span>
+        <span>{open ? 'مفتوح' : 'مغلق'}</span>
+      </div>
+    </header>
+  );
+}
+
+// ─── BOTTOM NAV ─────────────────────────────────────────────
+const TABS = [
+  { id: 'market', label: 'السوق', icon: Icons.market },
+  { id: 'screener', label: 'التصفيات', icon: Icons.filter },
+  { id: 'chart', label: 'الشارت', icon: Icons.chart },
+  { id: 'signals', label: 'التوصيات', icon: Icons.signal },
+  { id: 'account', label: 'حسابي', icon: Icons.user },
+];
+
+function BottomNav({ active, onNav }) {
+  return (
+    <nav className="bottom-nav">
+      {TABS.map(t => (
+        <button key={t.id} className={`nav-item ${active === t.id ? 'active' : ''}`}
+                onClick={() => onNav(t.id)}>
+          {t.icon}
+          <span>{t.label}</span>
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+// ─── MARKET PAGE ────────────────────────────────────────────
+function MarketPage() {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [summary, setSummary] = useState(null);
+  const [gainers, setGainers] = useState([]);
+  const [losers, setLosers] = useState([]);
+  const [topVol, setTopVol] = useState([]);
+  const [companies, setCompanies] = useState([]);
+  const [search, setSearch] = useState('');
+  const [sortCol, setSortCol] = useState(null);
+  const [sortDir, setSortDir] = useState('desc');
+  const [activeSector, setActiveSector] = useState('الكل');
+  const [sectors, setSectors] = useState([]);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [sum, g, l, v, sec] = await Promise.all([
+        StockAPI.marketSummary(),
+        StockAPI.gainers(5),
+        StockAPI.losers(5),
+        StockAPI.topVolume(5),
+        StockAPI.sectors(),
+      ]);
+      setSummary(sum);
+      setGainers(g.gainers || []);
+      setLosers(l.losers || []);
+      setTopVol(v.stocks || []);
+      setSectors(sec.sectors || []);
+
+      // جلب كل الشركات
+      const comp = await StockAPI.companies('', 'TASI', 100, 0);
+      let allComp = comp.results || [];
+      // جلب الباقي إذا فيه أكثر من 100
+      if (comp.total > 100) {
+        const pages = Math.ceil(comp.total / 100);
+        for (let i = 1; i < pages && i < 4; i++) {
+          const next = await StockAPI.companies('', 'TASI', 100, i * 100);
+          allComp = allComp.concat(next.results || []);
+        }
+      }
+      setCompanies(allComp);
+    } catch (e) {
+      setError(e.message);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  // الفلترة والبحث
+  const filtered = useMemo(() => {
+    let list = [...companies];
+    if (search) {
+      const s = search.toLowerCase();
+      list = list.filter(c =>
+        (c.name_ar || '').includes(s) ||
+        (c.name_en || '').toLowerCase().includes(s) ||
+        (c.symbol || '').includes(s)
+      );
+    }
+    // فلتر القطاع - TODO: ربط القطاعات لما نحصل على بيانات الأسعار
+    return list;
+  }, [companies, search]);
+
+  // الترتيب
+  const sorted = useMemo(() => {
+    if (!sortCol) return filtered;
+    return [...filtered].sort((a, b) => {
+      let va = a[sortCol], vb = b[sortCol];
+      if (typeof va === 'string') {
+        return sortDir === 'asc' ? va.localeCompare(vb, 'ar') : vb.localeCompare(va, 'ar');
+      }
+      va = va || 0; vb = vb || 0;
+      return sortDir === 'asc' ? va - vb : vb - va;
+    });
+  }, [filtered, sortCol, sortDir]);
+
+  function handleSort(col) {
+    if (sortCol === col) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortCol(col);
+      setSortDir('desc');
+    }
+  }
+
+  if (loading) {
+    return <div className="loading"><div className="spinner"></div><span>جاري تحميل بيانات السوق...</span></div>;
+  }
+
+  if (error) {
+    return (
+      <div className="loading">
+        <span style={{color: 'var(--red)'}}>⚠️ {error}</span>
+        <button className="refresh-btn" onClick={() => { StockAPI.clearCache(); loadData(); }}>
+          {Icons.refresh} إعادة المحاولة
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {/* ملخص السوق */}
+      {summary && (
+        <div className="market-strip">
+          <div className="ms-box">
+            <div className="ms-label">تاسي</div>
+            <div className="ms-val">{fmtNum(summary.index_value, 0)}</div>
+            <div className={`ms-sub ${chgClass(summary.index_change_percent)}`}>
+              {chgSign(summary.index_change_percent)}{fmtNum(summary.index_change_percent)}%
+            </div>
+          </div>
+          <div className="ms-box">
+            <div className="ms-label">مرتفعة</div>
+            <div className="ms-val text-green">{summary.advancing || 0}</div>
+            <div className="ms-sub" style={{color:'var(--red)'}}>منخفضة: {summary.declining || 0}</div>
+          </div>
+          <div className="ms-box">
+            <div className="ms-label">حجم التداول</div>
+            <div className="ms-val">{fmtVol(summary.total_volume)}</div>
+            <div className="ms-sub" style={{color:'var(--gray)'}}>{summary.market_mood || ''}</div>
+          </div>
+        </div>
+      )}
+
+      {/* بطاقات سريعة */}
+      <div className="section-title">{Icons.trending} الأكثر ارتفاعاً</div>
+      <div className="quick-cards">
+        {gainers.map(s => (
+          <div key={s.symbol} className="quick-card">
+            <div className="qc-title">🟢 رابح</div>
+            <div className="qc-name">{s.name || s.name_en}</div>
+            <div className="qc-price">{fmtNum(s.price)}</div>
+            <div className="qc-change td-up">{chgSign(s.change_percent)}{fmtNum(s.change_percent)}%</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="section-title">{Icons.trendDown} الأكثر انخفاضاً</div>
+      <div className="quick-cards">
+        {losers.map(s => (
+          <div key={s.symbol} className="quick-card">
+            <div className="qc-title">🔴 خاسر</div>
+            <div className="qc-name">{s.name || s.name_en}</div>
+            <div className="qc-price">{fmtNum(s.price)}</div>
+            <div className="qc-change td-down">{chgSign(s.change_percent)}{fmtNum(s.change_percent)}%</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="section-title">{Icons.volume} الأكثر نشاطاً</div>
+      <div className="quick-cards">
+        {topVol.map(s => (
+          <div key={s.symbol} className="quick-card">
+            <div className="qc-title">📊 نشاط</div>
+            <div className="qc-name">{s.name || s.name_en}</div>
+            <div className="qc-price">{fmtNum(s.price)}</div>
+            <div className="qc-change" style={{color:'var(--text-secondary)'}}>{fmtVol(s.volume)}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* البحث */}
+      <div className="flex-between" style={{marginTop: 16}}>
+        <div className="section-title" style={{margin:0}}>📋 جميع الأسهم ({filtered.length})</div>
+        <button className="refresh-btn" onClick={() => { StockAPI.clearCache(); loadData(); }}>
+          {Icons.refresh} تحديث
+        </button>
+      </div>
+
+      <div style={{marginTop: 8}}>
+        <div className="search-bar">
+          {Icons.search}
+          <input placeholder="ابحث بالاسم أو الرمز..." value={search}
+                 onChange={e => setSearch(e.target.value)} />
+        </div>
+      </div>
+
+      {/* جدول الأسهم */}
+      <div className="card">
+        <div className="stock-table">
+          <table>
+            <thead>
+              <tr>
+                <th onClick={() => handleSort('name_ar')}>
+                  السهم {sortCol === 'name_ar' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                </th>
+                <th onClick={() => handleSort('symbol')}>
+                  الرمز {sortCol === 'symbol' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.length === 0 ? (
+                <tr><td colSpan="2" style={{textAlign:'center', padding:20, color:'var(--gray)'}}>لا توجد نتائج</td></tr>
+              ) : (
+                sorted.map(c => (
+                  <tr key={c.symbol}>
+                    <td>
+                      <div className="stock-name">
+                        <span className="sn-name">{c.name_ar || c.name_en}</span>
+                        <span className="sn-symbol">{c.security_type || 'Equity'}</span>
+                      </div>
+                    </td>
+                    <td style={{fontWeight:700, color:'var(--navy)'}}>{c.symbol}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── COMING SOON PAGE ───────────────────────────────────────
+function ComingSoon({ title, desc }) {
+  return (
+    <div className="coming-soon">
+      {Icons.construct}
+      <h2>{title}</h2>
+      <p>{desc}</p>
+    </div>
+  );
+}
+
+// ─── APP COMPONENT ──────────────────────────────────────────
+function App() {
+  const [tab, setTab] = useState('market');
+  const [tasi, setTasi] = useState(null);
+
+  useEffect(() => {
+    StockAPI.marketSummary().then(setTasi).catch(() => {});
+  }, []);
+
+  return (
+    <>
+      <AppHeader tasi={tasi} />
+
+      <div className={`page ${tab === 'market' ? 'active' : ''}`}>
+        <MarketPage />
+      </div>
+
+      <div className={`page ${tab === 'screener' ? 'active' : ''}`}>
+        <ComingSoon title="التصفيات" desc="قريباً — فلاتر ومعادلات فنية لتصفية الأسهم الصاعدة والهابطة" />
+      </div>
+
+      <div className={`page ${tab === 'chart' ? 'active' : ''}`}>
+        <ComingSoon title="الشارت" desc="قريباً — شارت تفاعلي بشموع يابانية ومؤشرات فنية" />
+      </div>
+
+      <div className={`page ${tab === 'signals' ? 'active' : ''}`}>
+        <ComingSoon title="التوصيات" desc="قريباً — إنشاء ومتابعة التوصيات ومشاركتها مع المجموعة" />
+      </div>
+
+      <div className={`page ${tab === 'account' ? 'active' : ''}`}>
+        <ComingSoon title="حسابي" desc="قريباً — المحفظة وقائمة المراقبة والتنبيهات والإعدادات" />
+      </div>
+
+      <BottomNav active={tab} onNav={setTab} />
+    </>
+  );
+}
+
+// ─── RENDER ─────────────────────────────────────────────────
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+
+</body>
+</html>
