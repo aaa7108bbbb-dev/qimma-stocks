@@ -102,9 +102,19 @@ input,select{font-family:var(--font)}
 .tf-btns{display:flex;gap:6px;margin:8px 0;flex-wrap:wrap}
 .tf-btn{padding:5px 12px;border-radius:16px;font-size:12px;font-weight:600;border:1px solid var(--card-border);background:var(--card);color:var(--text-sec)}
 .tf-btn.atf{background:var(--navy);color:#fff;border-color:var(--navy)}
-.ind-btns{display:flex;gap:6px;margin:0 0 8px;flex-wrap:wrap}
-.ind-btn{padding:4px 12px;border-radius:16px;font-size:11px;font-weight:600;border:1px solid #2a3547;background:#1a2332;color:#8a95a6;cursor:pointer;font-family:Tajawal}
-.ind-btn.act{background:var(--gold);color:#fff;border-color:var(--gold)}
+.ind-icon{position:relative;width:36px;height:36px;border-radius:10px;background:#1a2332;border:1px solid #2a3547;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#8a95a6;transition:all .2s;flex-shrink:0}
+.ind-icon.act{background:#c8922a22;border-color:var(--gold);color:var(--gold)}
+.ind-badge{position:absolute;top:-4px;right:-4px;background:var(--gold);color:#fff;font-size:9px;font-weight:800;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.ind-panel{background:#1a2332;border:1px solid #2a3547;border-radius:12px;padding:4px 0;margin-bottom:8px}
+.ind-row{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;cursor:pointer;transition:background .15s}
+.ind-row:active{background:#2a354722}
+.ind-info{display:flex;align-items:center;gap:8px}
+.ind-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.ind-name{color:#b0b8c8;font-size:13px;font-weight:600}
+.ind-sw{width:40px;height:22px;border-radius:11px;background:#2a3547;position:relative;transition:background .2s;flex-shrink:0}
+.ind-sw.on{background:var(--gold)}
+.ind-sw::after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .2s}
+.ind-sw.on::after{transform:translateX(18px)}
 </style>
 </head>
 <body>
@@ -261,12 +271,14 @@ function ScreenerPage({goChart}){
   );
 }
 
-// ─── CHART PAGE (Candlestick) ───
 // ─── TECHNICAL INDICATORS ───
 function _sma(data,p){var r=[];for(var i=p-1;i<data.length;i++){var s=0;for(var j=i-p+1;j<=i;j++)s+=data[j].close;r.push({time:data[i].time,value:s/p})}return r}
+function _ema(data,p){var r=[],k=2/(p+1);if(!data.length)return r;r.push({time:data[0].time,value:data[0].close});for(var i=1;i<data.length;i++){r.push({time:data[i].time,value:data[i].close*k+r[i-1].value*(1-k)})}return r.slice(Math.max(0,p-1))}
 function _rsi(data,p){var r=[];if(data.length<p+1)return r;var g=0,l=0;for(var i=1;i<=p;i++){var d=data[i].close-data[i-1].close;if(d>=0)g+=d;else l-=d}var ag=g/p,al=l/p;r.push({time:data[p].time,value:al===0?100:100-100/(1+ag/al)});for(var i=p+1;i<data.length;i++){var d=data[i].close-data[i-1].close;ag=(ag*(p-1)+(d>0?d:0))/p;al=(al*(p-1)+(d<0?-d:0))/p;r.push({time:data[i].time,value:al===0?100:100-100/(1+ag/al)})}return r}
+function _bb(data,p,m){var u=[],lo=[],md=[];for(var i=p-1;i<data.length;i++){var s=0;for(var j=i-p+1;j<=i;j++)s+=data[j].close;var av=s/p;var sq=0;for(var j=i-p+1;j<=i;j++)sq+=Math.pow(data[j].close-av,2);var sd=Math.sqrt(sq/p);md.push({time:data[i].time,value:av});u.push({time:data[i].time,value:av+m*sd});lo.push({time:data[i].time,value:av-m*sd})}return{upper:u,lower:lo,mid:md}}
+function _macd(data){var e12=_ema(data,12),e26=_ema(data,26);if(!e26.length)return{line:[],signal:[],hist:[]};var ml=[];var off=e12.length-e26.length;for(var i=0;i<e26.length;i++){var j=i+off;if(j>=0&&j<e12.length)ml.push({time:e26[i].time,value:e12[j].value-e26[i].value,close:e12[j].value-e26[i].value})}if(ml.length<9)return{line:ml,signal:[],hist:[]};var sig=[],k=2/10;sig.push({time:ml[0].time,value:ml[0].value});for(var i=1;i<ml.length;i++)sig.push({time:ml[i].time,value:ml[i].value*k+sig[i-1].value*(1-k)});sig=sig.slice(8);var mh=[];var sOff=ml.length-sig.length;for(var i=sOff;i<ml.length;i++){var sv=sig[i-sOff].value;mh.push({time:ml[i].time,value:ml[i].value-sv,color:ml[i].value-sv>=0?'rgba(38,166,154,0.6)':'rgba(239,83,80,0.6)'})}return{line:ml.slice(sOff),signal:sig,hist:mh}}
 
-// ─── CHART PAGE (Professional) ───
+// ─── CHART PAGE ───
 function ChartPage({initSym}){
   var s=useState;
   var _1=s(initSym||''),sym=_1[0],sSym=_1[1];
@@ -275,12 +287,13 @@ function ChartPage({initSym}){
   var _4=s('1d'),tf=_4[0],sTf=_4[1];
   var _5=s('1Y'),rng=_5[0],sRng=_5[1];
   var _6=s(null),leg=_6[0],sLeg=_6[1];
-  var chartRef=useRef(null),rsiRef=useRef(null);
-  var chartInst=useRef(null),rsiInst=useRef(null);
+  var _7=s(false),showInd=_7[0],sShowInd=_7[1];
+  var _8=s({sma20:true,sma50:true,ema20:false,bb:false,rsi:true,macd:false}),ind=_8[0],sInd=_8[1];
+  var chartRef=useRef(null),rsiRef=useRef(null),macdRef=useRef(null);
+  var chartInst=useRef(null),rsiInst=useRef(null),macdInst=useRef(null);
 
   useEffect(function(){if(initSym){sSym(initSym)}},[initSym]);
 
-  // Calculate "from" date based on selected range
   function fromDate(range){
     var d=new Date();
     if(range==='1M')d.setMonth(d.getMonth()-1);
@@ -295,10 +308,9 @@ function ChartPage({initSym}){
   function loadChart(symbol,interval,range){
     if(!symbol||!symbol.trim())return;
     sLd(true);
-    var fr=fromDate(range||rng);
     Promise.all([
       StockAPI.quote(symbol.trim()),
-      StockAPI.hist(symbol.trim(),interval||tf,fr).catch(function(){return{data:[]}})
+      StockAPI.hist(symbol.trim(),interval||tf,fromDate(range||rng)).catch(function(){return{data:[]}})
     ]).then(function(r){
       sData(r[0]);
       renderChart(r[1].data||r[1].historical||[],r[0]);
@@ -308,7 +320,6 @@ function ChartPage({initSym}){
 
   useEffect(function(){if(initSym)loadChart(initSym,tf,rng)},[initSym]);
 
-  // Detect swing highs & lows (pivots)
   function findPivots(data,left,right){
     var mk=[];
     for(var i=left;i<data.length-right;i++){
@@ -326,13 +337,13 @@ function ChartPage({initSym}){
 
   function renderChart(hist,quote){
     if(!chartRef.current||!hist.length)return;
-    // Cleanup
     if(chartInst.current){try{chartInst.current.remove()}catch(e){}}
     if(rsiInst.current){try{rsiInst.current.remove()}catch(e){}}
+    if(macdInst.current){try{macdInst.current.remove()}catch(e){}}
     chartRef.current.innerHTML='';
     if(rsiRef.current)rsiRef.current.innerHTML='';
+    if(macdRef.current)macdRef.current.innerHTML='';
 
-    // Create main chart — dark professional theme
     var chart=LightweightCharts.createChart(chartRef.current,{
       width:chartRef.current.offsetWidth,height:450,
       layout:{background:{type:'solid',color:'#131722'},textColor:'#b0b8c8',fontFamily:'Tajawal',fontSize:11},
@@ -344,50 +355,39 @@ function ChartPage({initSym}){
     });
     chartInst.current=chart;
 
-    // Parse & sort raw OHLCV
     var raw=hist.map(function(d){return{time:d.date||d.timestamp,open:+d.open,high:+d.high,low:+d.low,close:+d.close,volume:+d.volume||0}}).filter(function(d){return d.time&&d.open}).sort(function(a,b){return a.time<b.time?-1:1});
     if(!raw.length)return;
 
-    // Heikin Ashi transformation
+    // Heikin Ashi
     var ha=[];
-    for(var j=0;j<raw.length;j++){
-      var r=raw[j];
-      var hc=(r.open+r.high+r.low+r.close)/4;
-      var ho=j===0?(r.open+r.close)/2:(ha[j-1].open+ha[j-1].close)/2;
-      ha.push({time:r.time,open:ho,high:Math.max(r.high,ho,hc),low:Math.min(r.low,ho,hc),close:hc});
-    }
+    for(var j=0;j<raw.length;j++){var r=raw[j];var hc=(r.open+r.high+r.low+r.close)/4;var ho=j===0?(r.open+r.close)/2:(ha[j-1].open+ha[j-1].close)/2;ha.push({time:r.time,open:ho,high:Math.max(r.high,ho,hc),low:Math.min(r.low,ho,hc),close:hc})}
 
-    // Candlestick series
-    var cSeries=chart.addCandlestickSeries({
-      upColor:'#26a69a',downColor:'#ef5350',
-      borderUpColor:'#26a69a',borderDownColor:'#ef5350',
-      wickUpColor:'#26a69a',wickDownColor:'#ef5350'
-    });
+    var cSeries=chart.addCandlestickSeries({upColor:'#26a69a',downColor:'#ef5350',borderUpColor:'#26a69a',borderDownColor:'#ef5350',wickUpColor:'#26a69a',wickDownColor:'#ef5350'});
     cSeries.setData(ha);
 
-    // ── Pivot Points: auto-detect swing highs/lows ──
+    // Pivots
     var pLen=Math.max(3,Math.min(12,Math.floor(raw.length/25)));
     var pivots=findPivots(raw,pLen,pLen);
     if(pivots.length){
       cSeries.setMarkers(pivots.map(function(p){return{time:p.time,position:p.position,shape:p.shape,color:p.color,text:p.text}}).sort(function(a,b){return a.time<b.time?-1:1}));
-
-      // ── Support/Resistance: lines from last 3 highs & 3 lows ──
       var highs=pivots.filter(function(p){return p.tp==='H'}).slice(-3);
       var lows=pivots.filter(function(p){return p.tp==='L'}).slice(-3);
       highs.forEach(function(p){cSeries.createPriceLine({price:p.val,color:'rgba(239,83,80,0.35)',lineWidth:1,lineStyle:2,axisLabelVisible:false,title:''})});
       lows.forEach(function(p){cSeries.createPriceLine({price:p.val,color:'rgba(38,166,154,0.35)',lineWidth:1,lineStyle:2,axisLabelVisible:false,title:''})});
     }
 
-    // ── SMA 20 (blue) & SMA 50 (orange) — always on ──
-    var d20=_sma(raw,20);if(d20.length)chart.addLineSeries({color:'#2196f3',lineWidth:1.5,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'SMA20'}).setData(d20);
-    var d50=_sma(raw,50);if(d50.length)chart.addLineSeries({color:'#ff9800',lineWidth:1.5,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'SMA50'}).setData(d50);
+    // ── Conditional Indicators ──
+    if(ind.sma20){var d20=_sma(raw,20);if(d20.length)chart.addLineSeries({color:'#2196f3',lineWidth:1.5,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'SMA20'}).setData(d20)}
+    if(ind.sma50){var d50=_sma(raw,50);if(d50.length)chart.addLineSeries({color:'#ff9800',lineWidth:1.5,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'SMA50'}).setData(d50)}
+    if(ind.ema20){var de=_ema(raw,20);if(de.length)chart.addLineSeries({color:'#00bcd4',lineWidth:1.5,lineStyle:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'EMA20'}).setData(de)}
+    if(ind.bb){var bb=_bb(raw,20,2);if(bb.upper.length){chart.addLineSeries({color:'rgba(156,39,176,0.5)',lineWidth:1,lineStyle:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false}).setData(bb.upper);chart.addLineSeries({color:'rgba(156,39,176,0.5)',lineWidth:1,lineStyle:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false}).setData(bb.lower);chart.addLineSeries({color:'rgba(156,39,176,0.3)',lineWidth:1,lineStyle:3,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'BB'}).setData(bb.mid)}}
 
-    // ── Volume bars ──
+    // Volume
     var volS=chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:'vol'});
     chart.priceScale('vol').applyOptions({scaleMargins:{top:0.85,bottom:0}});
     volS.setData(raw.map(function(d){return{time:d.time,value:d.volume,color:d.close>=d.open?'rgba(38,166,154,0.25)':'rgba(239,83,80,0.25)'}}));
 
-    // ── Crosshair OHLCV legend ──
+    // Legend
     chart.subscribeCrosshairMove(function(param){
       if(!param||!param.time){sLeg(null);return}
       var cd=param.seriesData&&param.seriesData.get(cSeries);
@@ -395,15 +395,9 @@ function ChartPage({initSym}){
       if(cd)sLeg({o:cd.open,h:cd.high,l:cd.low,c:cd.close,v:vd?vd.value:0});
     });
 
-    // ── RSI pane ──
-    if(rsiRef.current){
-      var rc=LightweightCharts.createChart(rsiRef.current,{
-        width:rsiRef.current.offsetWidth,height:100,
-        layout:{background:{type:'solid',color:'#131722'},textColor:'#8a95a6',fontFamily:'Tajawal',fontSize:10},
-        grid:{vertLines:{color:'#1c2a3a'},horzLines:{color:'#1c2a3a'}},
-        rightPriceScale:{borderColor:'#2a3547',scaleMargins:{top:0.1,bottom:0.1}},
-        timeScale:{visible:false},crosshair:{mode:0}
-      });
+    // RSI pane
+    if(ind.rsi&&rsiRef.current){
+      var rc=LightweightCharts.createChart(rsiRef.current,{width:rsiRef.current.offsetWidth,height:100,layout:{background:{type:'solid',color:'#131722'},textColor:'#8a95a6',fontFamily:'Tajawal',fontSize:10},grid:{vertLines:{color:'#1c2a3a'},horzLines:{color:'#1c2a3a'}},rightPriceScale:{borderColor:'#2a3547',scaleMargins:{top:0.1,bottom:0.1}},timeScale:{visible:false},crosshair:{mode:0}});
       rsiInst.current=rc;
       var rsiD=_rsi(raw,14);
       if(rsiD.length){
@@ -414,22 +408,44 @@ function ChartPage({initSym}){
       chart.timeScale().subscribeVisibleLogicalRangeChange(function(range){if(range)rc.timeScale().setVisibleLogicalRange(range)});
     }
 
-    chart.timeScale().fitContent();
+    // MACD pane
+    if(ind.macd&&macdRef.current){
+      var mc=LightweightCharts.createChart(macdRef.current,{width:macdRef.current.offsetWidth,height:100,layout:{background:{type:'solid',color:'#131722'},textColor:'#8a95a6',fontFamily:'Tajawal',fontSize:10},grid:{vertLines:{color:'#1c2a3a'},horzLines:{color:'#1c2a3a'}},rightPriceScale:{borderColor:'#2a3547',scaleMargins:{top:0.1,bottom:0.1}},timeScale:{visible:false},crosshair:{mode:0}});
+      macdInst.current=mc;
+      var md=_macd(raw);
+      if(md.hist.length)mc.addHistogramSeries({priceFormat:{type:'price'},priceLineVisible:false}).setData(md.hist);
+      if(md.line.length)mc.addLineSeries({color:'#2196f3',lineWidth:1,priceLineVisible:false,lastValueVisible:false,title:'MACD'}).setData(md.line);
+      if(md.signal.length)mc.addLineSeries({color:'#ff9800',lineWidth:1,priceLineVisible:false,lastValueVisible:false,title:'Signal'}).setData(md.signal);
+      chart.timeScale().subscribeVisibleLogicalRangeChange(function(range){if(range)mc.timeScale().setVisibleLogicalRange(range)});
+    }
 
-    // Responsive resize
+    chart.timeScale().fitContent();
     var ro=new ResizeObserver(function(){
       if(chartRef.current)chart.applyOptions({width:chartRef.current.offsetWidth});
       if(rsiRef.current&&rsiInst.current)rsiInst.current.applyOptions({width:rsiRef.current.offsetWidth});
+      if(macdRef.current&&macdInst.current)macdInst.current.applyOptions({width:macdRef.current.offsetWidth});
     });
     ro.observe(chartRef.current);
   }
 
   function changeRange(r){sRng(r);if(sym)loadChart(sym,tf,r)}
   function changeTf(iv){sTf(iv);if(sym)loadChart(sym,iv,rng)}
+  function togInd(key){var n={};for(var k in ind)n[k]=ind[k];n[key]=!n[key];sInd(n);if(sym)setTimeout(function(){loadChart(sym,tf,rng)},50)}
 
-  // Range & timeframe config
   var RNG=[{k:'1M',l:'شهر'},{k:'3M',l:'3 أشهر'},{k:'6M',l:'6 أشهر'},{k:'1Y',l:'سنة'},{k:'2Y',l:'سنتين'},{k:'MAX',l:'الكل'}];
   var TFS=[{k:'1d',l:'يومي'},{k:'1w',l:'أسبوعي'},{k:'1m',l:'شهري'}];
+  var INDS=[
+    {k:'sma20',l:'SMA 20',c:'#2196f3'},
+    {k:'sma50',l:'SMA 50',c:'#ff9800'},
+    {k:'ema20',l:'EMA 20',c:'#00bcd4'},
+    {k:'bb',l:'بولنجر',c:'#9c27b0'},
+    {k:'rsi',l:'RSI 14',c:'#e040fb'},
+    {k:'macd',l:'MACD',c:'#2196f3'}
+  ];
+  // Indicator icon SVG
+  var indIcon=React.createElement('svg',{width:18,height:18,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:1.75,strokeLinecap:'round',strokeLinejoin:'round'},React.createElement('path',{d:'M3 3v18h18'}),React.createElement('path',{d:'M7 16l4-6 4 4 5-8'}));
+  // Active indicator count
+  var indCount=Object.keys(ind).filter(function(k){return ind[k]}).length;
 
   return React.createElement(React.Fragment,null,
     React.createElement('div',{className:'stit'},Ic.cht,' الشارت'),
@@ -438,12 +454,24 @@ function ChartPage({initSym}){
       React.createElement('div',{className:'sbar',style:{flex:1,marginBottom:0}},Ic.srch,React.createElement('input',{placeholder:'أدخل الرمز (مثل 2222)...',value:sym,onChange:function(e){sSym(e.target.value)},onKeyDown:function(e){if(e.key==='Enter')loadChart(sym,tf,rng)}})),
       React.createElement('button',{className:'rbtn',style:{padding:'8px 16px'},onClick:function(){loadChart(sym,tf,rng)}},'عرض')
     ),
-    // Range bar: periods + candle interval
+    // Range bar + indicator icon
     React.createElement('div',{className:'rng-bar'},
       RNG.map(function(r){return React.createElement('button',{key:r.k,className:'rng-btn'+(rng===r.k?' act':''),onClick:function(){changeRange(r.k)}},r.l)}),
       React.createElement('span',{className:'rng-sep'},'│'),
-      TFS.map(function(t){return React.createElement('button',{key:t.k,className:'tf2-btn'+(tf===t.k?' act':''),onClick:function(){changeTf(t.k)}},t.l)})
+      TFS.map(function(t){return React.createElement('button',{key:t.k,className:'tf2-btn'+(tf===t.k?' act':''),onClick:function(){changeTf(t.k)}},t.l)}),
+      React.createElement('span',{className:'rng-sep'}),
+      React.createElement('button',{className:'ind-icon'+(showInd?' act':''),onClick:function(){sShowInd(!showInd)},title:'المؤشرات الفنية'},indIcon,indCount>0?React.createElement('span',{className:'ind-badge'},indCount):null)
     ),
+    // Indicator panel (toggleable)
+    showInd?React.createElement('div',{className:'ind-panel'},
+      INDS.map(function(b){return React.createElement('div',{key:b.k,className:'ind-row',onClick:function(){togInd(b.k)}},
+        React.createElement('div',{className:'ind-info'},
+          React.createElement('span',{className:'ind-dot',style:{background:b.c}}),
+          React.createElement('span',{className:'ind-name'},b.l)
+        ),
+        React.createElement('div',{className:'ind-sw'+(ind[b.k]?' on':'')}))
+      })
+    ):null,
     // Loading
     ld?React.createElement('div',{className:'ldg'},React.createElement('div',{className:'spin'}),'جاري تحميل الشارت...'):null,
     // Chart wrap
@@ -456,10 +484,12 @@ function ChartPage({initSym}){
         React.createElement('span',null,'V ',React.createElement('span',{className:'lg-v'},fV(leg.v)))
       ):null,
       React.createElement('div',{id:'chart-box',ref:chartRef}),
-      React.createElement('div',{className:'rsi-label'},'RSI (14)'),
-      React.createElement('div',{id:'rsi-box',ref:rsiRef})
+      ind.rsi?React.createElement('div',{className:'rsi-label'},'RSI (14)'):null,
+      ind.rsi?React.createElement('div',{id:'rsi-box',ref:rsiRef}):null,
+      ind.macd?React.createElement('div',{className:'rsi-label',style:{color:'#2196f3'}},'MACD (12,26,9)'):null,
+      ind.macd?React.createElement('div',{id:'macd-box',ref:macdRef,style:{width:'100%',height:100}}):null
     ),
-    // Stock info card
+    // Stock info
     data?React.createElement(React.Fragment,null,
       React.createElement('div',{className:'card',style:{padding:12,marginBottom:12,marginTop:12}},
         React.createElement('div',{className:'flx'},
@@ -470,7 +500,7 @@ function ChartPage({initSym}){
       React.createElement('div',{className:'sdg'},
         [{l:'الافتتاح',v:fN(data.open)},{l:'الأعلى',v:fN(data.high)},{l:'الأدنى',v:fN(data.low)},{l:'الإغلاق السابق',v:fN(data.previous_close)},{l:'الحجم',v:fV(data.volume)},{l:'القيمة',v:fV(data.value)}].map(function(x,i){return React.createElement('div',{key:i,className:'sdi'},React.createElement('div',{className:'sdl'},x.l),React.createElement('div',{className:'sdv'},x.v))})
       )
-    ):!ld?React.createElement('div',{className:'cs'},Ic.cht,React.createElement('h2',null,'ابحث عن سهم'),React.createElement('p',null,'أدخل رمز السهم وشاهد الشارت الاحترافي مع القمم والقيعان')):null
+    ):!ld?React.createElement('div',{className:'cs'},Ic.cht,React.createElement('h2',null,'ابحث عن سهم'),React.createElement('p',null,'أدخل رمز السهم وشاهد الشارت الاحترافي')):null
   );
 }
 
