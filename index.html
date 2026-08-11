@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>قمة الأسهم</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+:root{--navy:#0f1b2d;--navy-light:#1a2d47;--gold:#c8922a;--gold-light:#e0b85c;--gold-dim:rgba(200,146,42,0.15);--green:#00c853;--green-bg:rgba(0,200,83,0.1);--red:#ff1744;--red-bg:rgba(255,23,68,0.1);--gray:#8899aa;--gray-light:#c5d0db;--bg:#f4f5f7;--card:#ffffff;--card-border:#e8ecf0;--text:#1a2332;--text-sec:#5a6a7a;--font:'Tajawal',sans-serif;--radius:14px;--radius-sm:8px;--shadow:0 2px 12px rgba(15,27,45,0.06);--nav-h:64px;--hdr-h:56px}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100dvh;overflow-x:hidden;padding-bottom:calc(var(--nav-h)+16px);padding-top:var(--hdr-h)}
+button{font-family:var(--font);cursor:pointer;border:none;background:none}
+input,select{font-family:var(--font)}
+
+.hdr{position:fixed;top:0;left:0;right:0;height:var(--hdr-h);background:var(--navy);display:flex;align-items:center;justify-content:space-between;padding:0 16px;z-index:100;box-shadow:0 2px 16px rgba(0,0,0,0.2)}
+.hdr .logo{display:flex;align-items:center;gap:8px;color:var(--gold);font-weight:800;font-size:18px}
+.hdr .logo svg{width:28px;height:28px}
+.tasi-m{display:flex;align-items:center;gap:8px;color:#fff;font-size:13px;font-weight:500}
+.tasi-m .val{font-weight:700;font-size:15px}
+.tasi-m .chg{font-size:12px;padding:2px 6px;border-radius:4px;font-weight:700}
+.chg.up{background:var(--green-bg);color:var(--green)}
+.chg.dn{background:var(--red-bg);color:var(--red)}
+.hdr-st{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--gray);font-weight:500}
+.dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+.dot.on{background:var(--green);box-shadow:0 0 6px var(--green)}.dot.off{background:var(--red)}
+
+.bnav{position:fixed;bottom:0;left:0;right:0;height:var(--nav-h);background:var(--card);border-top:1px solid var(--card-border);display:flex;align-items:center;justify-content:space-around;z-index:100;padding-bottom:env(safe-area-inset-bottom,0);box-shadow:0 -2px 16px rgba(0,0,0,0.04)}
+.ni{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;font-weight:500;color:var(--gray);padding:6px 0;transition:color 0.2s;-webkit-tap-highlight-color:transparent}
+.ni.act{color:var(--gold)}.ni svg{width:22px;height:22px;stroke-width:1.75}
+
+.pg{display:none;padding:12px}.pg.act{display:block}
+.card{background:var(--card);border-radius:var(--radius);border:1px solid var(--card-border);box-shadow:var(--shadow);overflow:hidden}
+
+.qcs{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;padding:4px 2px 12px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.qcs::-webkit-scrollbar{display:none}
+.qc{scroll-snap-align:start;min-width:140px;flex-shrink:0;background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:12px;display:flex;flex-direction:column;gap:6px;cursor:pointer}
+.qc:active{border-color:var(--gold)}
+.qc-t{font-size:11px;color:var(--text-sec);font-weight:500}
+.qc-n{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
+.qc-p{font-size:15px;font-weight:800}
+.qc-c{font-size:12px;font-weight:700}
+
+.sbar{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:10px}
+.sbar svg{width:18px;height:18px;color:var(--gray);flex-shrink:0}
+.sbar input{flex:1;border:none;outline:none;font-size:14px;background:transparent;color:var(--text)}
+
+.stbl{width:100%;overflow-x:auto}
+.stbl table{width:100%;border-collapse:collapse;font-size:13px}
+.stbl th{position:sticky;top:0;background:var(--bg);color:var(--text-sec);font-weight:600;font-size:11px;padding:8px 6px;text-align:right;border-bottom:2px solid var(--card-border);cursor:pointer;white-space:nowrap}
+.stbl td{padding:10px 6px;text-align:right;border-bottom:1px solid var(--card-border);white-space:nowrap}
+.stbl tbody tr:active{background:var(--gold-dim)}
+.sn{display:flex;flex-direction:column}.sn-n{font-weight:700;font-size:12px}.sn-s{font-size:11px;color:var(--gray)}
+.up{color:var(--green);font-weight:700}.dn{color:var(--red);font-weight:700}.fl{color:var(--gray)}
+
+.stit{font-size:15px;font-weight:700;margin:16px 0 8px;color:var(--text);display:flex;align-items:center;gap:6px}
+.stit svg{width:18px;height:18px;color:var(--gold)}
+
+.ldg{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:12px;color:var(--text-sec);font-size:14px}
+.spin{width:36px;height:36px;border:3px solid var(--card-border);border-top-color:var(--gold);border-radius:50%;animation:sp 0.8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+.ms{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.msb{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:10px;text-align:center}
+.msb .ml{font-size:10px;color:var(--text-sec);font-weight:500}
+.msb .mv{font-size:16px;font-weight:800;margin-top:2px}
+.msb .ms2{font-size:11px;font-weight:600;margin-top:2px}
+
+.rbtn{display:flex;align-items:center;gap:4px;background:var(--gold-dim);color:var(--gold);padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600}
+.rbtn svg{width:14px;height:14px}
+.flx{display:flex;align-items:center;justify-content:space-between}
+
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+.pc{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:14px 12px;cursor:pointer;transition:all 0.2s}
+.pc:active{transform:scale(0.97);border-color:var(--gold)}
+.pc.apc{border-color:var(--gold);background:var(--gold-dim)}
+.pc-i{font-size:20px;margin-bottom:4px}
+.pc-t{font-size:13px;font-weight:700}
+.pc-d{font-size:10px;color:var(--text-sec);margin-top:2px}
+.pc-c{font-size:12px;font-weight:700;color:var(--gold);margin-top:4px}
+
+.sdg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.sdi{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:10px;text-align:center}
+.sdi .sdl{font-size:10px;color:var(--text-sec)}.sdi .sdv{font-size:14px;font-weight:700;margin-top:2px}
+
+.cs{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 20px;gap:16px;text-align:center}
+.cs svg{width:64px;height:64px;color:var(--gold-light)}
+.cs h2{font-size:20px}.cs p{font-size:14px;color:var(--text-sec);max-width:280px}
+
+#chart-box{width:100%;height:300px;border-radius:var(--radius-sm);overflow:hidden;margin:8px 0}
+.tf-btns{display:flex;gap:6px;margin:8px 0;flex-wrap:wrap}
+.tf-btn{padding:5px 12px;border-radius:16px;font-size:12px;font-weight:600;border:1px solid var(--card-border);background:var(--card);color:var(--text-sec)}
+.tf-btn.atf{background:var(--navy);color:#fff;border-color:var(--navy)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script type="text/babel">
+var useState=React.useState,useEffect=React.useEffect,useCallback=React.useCallback,useMemo=React.useMemo,useRef=React.useRef;
+
+var API_KEY='shmk_live_243cd1b92526f7cc5a4dfcb253bbe76b99286c7741741c21';
+
+var StockAPI={
+  _c:{},_t:{},_ttl:5*60*1000,
+  async _f(ep){
+    var n=Date.now();
+    if(this._c[ep]&&(n-this._t[ep])<this._ttl)return this._c[ep];
+    var urls=['/api/proxy?p='+encodeURIComponent(ep)];
+    var le=null;
+    for(var i=0;i<urls.length;i++){
+      try{
+        var h=i===0?{}:{'X-API-Key':API_KEY};
+        var r=await fetch(urls[i],{headers:h});
+        if(!r.ok){var e=await r.json().catch(function(){return{}});throw new Error((e.error&&e.error.message)||'HTTP '+r.status)}
+        var d=await r.json();this._c[ep]=d;this._t[ep]=n;return d;
+      }catch(e){le=e}
+    }
+    throw le||new Error('فشل الاتصال');
+  },
+  summary(idx){return this._f('/market/summary/?index='+(idx||'TASI'))},
+  gainers(n,idx){return this._f('/market/gainers/?limit='+(n||10)+'&index='+(idx||'TASI'))},
+  losers(n,idx){return this._f('/market/losers/?limit='+(n||10)+'&index='+(idx||'TASI'))},
+  topVol(n,idx){return this._f('/market/volume/?limit='+(n||10)+'&index='+(idx||'TASI'))},
+  topVal(n,idx){return this._f('/market/value/?limit='+(n||10)+'&index='+(idx||'TASI'))},
+  quote(s){return this._f('/quote/'+s+'/')},
+  hist(s,iv){return this._f('/historical/'+s+'/?interval='+(iv||'1d'))},
+  clear(){this._c={};this._t={}}
+};
+
+function fN(n,d){if(n==null||isNaN(n))return'—';return Number(n).toLocaleString('en-US',{minimumFractionDigits:d!=null?d:2,maximumFractionDigits:d!=null?d:2})}
+function fV(n){if(n==null)return'—';if(n>=1e9)return(n/1e9).toFixed(1)+'B';if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(0)+'K';return''+n}
+function cc(v){return v>0?'up':v<0?'dn':'fl'}
+function cs(v){return v>0?'+':''}
+function isOpen(){var n=new Date(),k=new Date(n.toLocaleString('en-US',{timeZone:'Asia/Riyadh'})),d=k.getDay(),m=k.getHours()*60+k.getMinutes();return d>=0&&d<=4&&m>=600&&m<=900}
+
+var Ic={
+  logo:React.createElement('svg',{viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeLinecap:'round',strokeLinejoin:'round'},React.createElement('path',{d:'M12 2L2 7l10 5 10-5-10-5z'}),React.createElement('path',{d:'M2 17l10 5 10-5'}),React.createElement('path',{d:'M2 12l10 5 10-5'})),
+  mkt:React.createElement('svg',{viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeLinecap:'round',strokeLinejoin:'round'},React.createElement('path',{d:'M3 3v18h18'}),React.createElement('path',{d:'M7 16l4-4 4 4 5-5'})),
+  flt:React.createElement('svg',{viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeLinecap:'round',strokeLinejoin:'round'},React.createElement('path',{d:'M3 4h18'}),React.createElement('path',{d:'M7 8h10'}),React.createElement('path',{d:'M10 12h4'})),
+  cht:React.createElement('svg',{viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeLinecap:'round',strokeLinejoin:'round'},React.createElement('rect',{x:'2',y:'3',width:'20',height:'18',rx:'2'}),React.createElement('path',{d:'M7 15l3-3 3 3 4-4'})),
+  sig:React.createElement('svg',{viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeLinecap:'round',strokeLinejoin:'round'},React.createElement('path',{d:'M2 20h20'}),React.createElement('rect',{x:'4',y:'14',width:'3',height:'6',rx:'1'}),React.createElement('rect',{x:'10.5',y:'8',width:'3',height:'12',rx:'1'}),React.createElement('rect',{x:'17',y:'4',width:'3',height:'16',rx:'1'})),
+  usr:React.createElement('svg',{viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeLinecap:'round',strokeLinejoin:'round'},React.createElement('circle',{cx:'12',cy:'8',r:'4'}),React.createElement('path',{d:'M5 20c0-4 3.5-7 7-7s7 3 7 7'})),
+  srch:React.createElement('svg',{viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeLinecap:'round',strokeLinejoin:'round'},React.createElement('circle',{cx:'11',cy:'11',r:'7'}),React.createElement('path',{d:'M21 21l-4-4'})),
+  ref:React.createElement('svg',{viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeLinecap:'round',strokeLinejoin:'round'},React.createElement('path',{d:'M3 12a9 9 0 0 1 15-6.7L21 8'}),React.createElement('path',{d:'M21 3v5h-5'})),
+  tu:React.createElement('svg',{viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeLinecap:'round',strokeLinejoin:'round'},React.createElement('path',{d:'M22 7l-8.5 8.5-5-5L2 17'}),React.createElement('path',{d:'M16 7h6v6'})),
+  td:React.createElement('svg',{viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeLinecap:'round',strokeLinejoin:'round'},React.createElement('path',{d:'M22 17l-8.5-8.5-5 5L2 7'}),React.createElement('path',{d:'M16 17h6v-6'})),
+  vol:React.createElement('svg',{viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeLinecap:'round',strokeLinejoin:'round'},React.createElement('rect',{x:'4',y:'10',width:'4',height:'10',rx:'1'}),React.createElement('rect',{x:'10',y:'4',width:'4',height:'16',rx:'1'}),React.createElement('rect',{x:'16',y:'8',width:'4',height:'12',rx:'1'})),
+  bld:React.createElement('svg',{viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeLinecap:'round',strokeLinejoin:'round'},React.createElement('rect',{x:'2',y:'6',width:'20',height:'12',rx:'2'}),React.createElement('path',{d:'M12 12h.01'})),
+};
+
+// ─── HEADER ───
+function Hdr({tasi}){
+  var o=isOpen();
+  return React.createElement('header',{className:'hdr'},
+    React.createElement('div',{className:'logo'},Ic.logo,'قمة الأسهم'),
+    tasi?React.createElement('div',{className:'tasi-m'},
+      'تاسي',React.createElement('span',{className:'val'},fN(tasi.index_value,0)),
+      React.createElement('span',{className:'chg '+(tasi.index_change_percent>=0?'up':'dn')},cs(tasi.index_change_percent)+fN(tasi.index_change_percent)+'%')
+    ):React.createElement('div',{className:'tasi-m'},React.createElement('span',{style:{color:'var(--gray)'}},'...')),
+    React.createElement('div',{className:'hdr-st'},React.createElement('span',{className:'dot '+(o?'on':'off')}),o?'مفتوح':'مغلق')
+  );
+}
+
+// ─── NAV ───
+var TABS=[{id:'market',l:'السوق',i:Ic.mkt},{id:'screener',l:'التصفيات',i:Ic.flt},{id:'chart',l:'الشارت',i:Ic.cht},{id:'signals',l:'التوصيات',i:Ic.sig},{id:'account',l:'حسابي',i:Ic.usr}];
+function Nav({act,onNav}){
+  return React.createElement('nav',{className:'bnav'},TABS.map(function(t){
+    return React.createElement('button',{key:t.id,className:'ni '+(act===t.id?'act':''),onClick:function(){onNav(t.id)}},t.i,React.createElement('span',null,t.l));
+  }));
+}
+
+// ─── MARKET ───
+function MarketPage({goChart}){
+  var s=useState,s1=s(true),ld=s1[0],sLd=s1[1],s2=s(null),er=s2[0],sEr=s2[1],s3=s(null),sm=s3[0],sSm=s3[1];
+  var s4=s([]),gn=s4[0],sGn=s4[1],s5=s([]),ls=s5[0],sLs=s5[1],s6=s([]),tv=s6[0],sTv=s6[1],s7=s(''),sq=s7[0],sSq=s7[1];
+  var load=useCallback(function(){
+    sLd(true);sEr(null);
+    Promise.all([StockAPI.summary(),StockAPI.gainers(10),StockAPI.losers(10),StockAPI.topVol(10)]).then(function(r){
+      sSm(r[0]);sGn(r[1].gainers||[]);sLs(r[2].losers||[]);sTv(r[3].stocks||[]);sLd(false);
+    }).catch(function(e){sEr(e.message);sLd(false)});
+  },[]);
+  useEffect(function(){load()},[load]);
+
+  var all=useMemo(function(){var m={};[].concat(gn,ls,tv).forEach(function(s){if(s.symbol)m[s.symbol]=s});var a=Object.values(m);if(sq){var q=sq.toLowerCase();a=a.filter(function(c){return(c.name||'').includes(q)||(c.symbol||'').includes(q)})}return a},[gn,ls,tv,sq]);
+
+  if(ld)return React.createElement('div',{className:'ldg'},React.createElement('div',{className:'spin'}),'جاري تحميل بيانات السوق...');
+  if(er)return React.createElement('div',{className:'ldg'},React.createElement('span',{style:{color:'var(--red)'}},'⚠️ '+er),React.createElement('button',{className:'rbtn',onClick:function(){StockAPI.clear();load()}},Ic.ref,' إعادة المحاولة'));
+
+  function QC(list,tag,cls){return React.createElement('div',{className:'qcs'},list.slice(0,5).map(function(s){return React.createElement('div',{key:s.symbol,className:'qc',onClick:function(){goChart(s.symbol)}},React.createElement('div',{className:'qc-t'},tag),React.createElement('div',{className:'qc-n'},s.name||s.name_en),React.createElement('div',{className:'qc-p'},fN(s.price)),React.createElement('div',{className:'qc-c '+cls},cs(s.change_percent)+fN(s.change_percent)+'%'))}))}
+
+  return React.createElement(React.Fragment,null,
+    sm&&React.createElement('div',{className:'ms'},
+      React.createElement('div',{className:'msb'},React.createElement('div',{className:'ml'},'تاسي'),React.createElement('div',{className:'mv'},fN(sm.index_value,0)),React.createElement('div',{className:'ms2 '+cc(sm.index_change_percent)},cs(sm.index_change_percent)+fN(sm.index_change_percent)+'%')),
+      React.createElement('div',{className:'msb'},React.createElement('div',{className:'ml'},'مرتفعة'),React.createElement('div',{className:'mv',style:{color:'var(--green)'}},sm.advancing||0),React.createElement('div',{className:'ms2',style:{color:'var(--red)'}},'منخفضة: '+(sm.declining||0))),
+      React.createElement('div',{className:'msb'},React.createElement('div',{className:'ml'},'حجم التداول'),React.createElement('div',{className:'mv'},fV(sm.total_volume)),React.createElement('div',{className:'ms2',style:{color:'var(--gray)'}},sm.market_mood||''))
+    ),
+    React.createElement('div',{className:'stit'},Ic.tu,' الأكثر ارتفاعاً'),QC(gn,'🟢 رابح','up'),
+    React.createElement('div',{className:'stit'},Ic.td,' الأكثر انخفاضاً'),QC(ls,'🔴 خاسر','dn'),
+    React.createElement('div',{className:'stit'},Ic.vol,' الأكثر نشاطاً'),
+    React.createElement('div',{className:'qcs'},tv.slice(0,5).map(function(s){return React.createElement('div',{key:s.symbol,className:'qc',onClick:function(){goChart(s.symbol)}},React.createElement('div',{className:'qc-t'},'📊 نشاط'),React.createElement('div',{className:'qc-n'},s.name||s.name_en),React.createElement('div',{className:'qc-p'},fN(s.price)),React.createElement('div',{className:'qc-c',style:{color:'var(--text-sec)'}},fV(s.volume)))})),
+    React.createElement('div',{className:'flx',style:{marginTop:16}},React.createElement('div',{className:'stit',style:{margin:0}},'📋 جميع الأسهم ('+all.length+')'),React.createElement('button',{className:'rbtn',onClick:function(){StockAPI.clear();load()}},Ic.ref,' تحديث')),
+    React.createElement('div',{style:{marginTop:8}},React.createElement('div',{className:'sbar'},Ic.srch,React.createElement('input',{placeholder:'ابحث بالاسم أو الرمز...',value:sq,onChange:function(e){sSq(e.target.value)}}))),
+    React.createElement('div',{className:'card'},React.createElement('div',{className:'stbl'},React.createElement('table',null,
+      React.createElement('thead',null,React.createElement('tr',null,React.createElement('th',null,'السهم'),React.createElement('th',null,'السعر'),React.createElement('th',null,'التغير%'),React.createElement('th',null,'الحجم'))),
+      React.createElement('tbody',null,all.map(function(c){return React.createElement('tr',{key:c.symbol,onClick:function(){goChart(c.symbol)}},
+        React.createElement('td',null,React.createElement('div',{className:'sn'},React.createElement('span',{className:'sn-n'},c.name||c.name_en),React.createElement('span',{className:'sn-s'},c.symbol))),
+        React.createElement('td',{style:{fontWeight:700}},fN(c.price)),React.createElement('td',{className:cc(c.change_percent)},cs(c.change_percent)+fN(c.change_percent)+'%'),
+        React.createElement('td',{style:{color:'var(--text-sec)'}},fV(c.volume))
+      )})))))
+  );
+}
+
+// ─── SCREENER ───
+function ScreenerPage({goChart}){
+  var s=useState,s1=s(null),ap=s1[0],sAp=s1[1],s2=s([]),res=s2[0],sRes=s2[1],s3=s(false),ld=s3[0],sLd=s3[1];
+  function run(id){
+    sAp(id);sLd(true);
+    var p;
+    if(id==='gainers')p=StockAPI.gainers(50).then(function(r){return r.gainers||[]});
+    else if(id==='losers')p=StockAPI.losers(50).then(function(r){return r.losers||[]});
+    else if(id==='bigUp')p=StockAPI.gainers(50).then(function(r){return(r.gainers||[]).filter(function(s){return s.change_percent>=3})});
+    else if(id==='bigDn')p=StockAPI.losers(50).then(function(r){return(r.losers||[]).filter(function(s){return s.change_percent<=-3})});
+    else if(id==='vol')p=StockAPI.topVol(50).then(function(r){return r.stocks||[]});
+    else if(id==='val')p=StockAPI.topVal(50).then(function(r){return r.stocks||[]});
+    else p=Promise.resolve([]);
+    p.then(function(r){sRes(r);sLd(false)}).catch(function(){sLd(false)});
+  }
+  var prs=[{id:'gainers',i:'🟢',t:'الأسهم المرتفعة',d:'كل الإيجابية اليوم'},{id:'losers',i:'🔴',t:'الأسهم المنخفضة',d:'كل السلبية اليوم'},{id:'bigUp',i:'🚀',t:'ارتفاع قوي +3%',d:'أسهم ارتفعت أكثر من 3%'},{id:'bigDn',i:'📉',t:'انخفاض قوي -3%',d:'أسهم انخفضت أكثر من 3%'},{id:'vol',i:'📊',t:'الأعلى حجماً',d:'الأكثر تداولاً بالحجم'},{id:'val',i:'💰',t:'الأعلى قيمة',d:'الأكثر تداولاً بالقيمة'}];
+
+  return React.createElement(React.Fragment,null,
+    React.createElement('div',{className:'stit'},Ic.flt,' تصفيات جاهزة'),
+    React.createElement('div',{className:'pgrid'},prs.map(function(p){return React.createElement('div',{key:p.id,className:'pc'+(ap===p.id?' apc':''),onClick:function(){run(p.id)}},React.createElement('div',{className:'pc-i'},p.i),React.createElement('div',{className:'pc-t'},p.t),React.createElement('div',{className:'pc-d'},p.d))})),
+    ap&&React.createElement(React.Fragment,null,
+      React.createElement('div',{className:'stit'},'📋 النتائج ('+res.length+')'),
+      ld?React.createElement('div',{className:'ldg'},React.createElement('div',{className:'spin'})):
+      React.createElement('div',{className:'card'},React.createElement('div',{className:'stbl'},React.createElement('table',null,
+        React.createElement('thead',null,React.createElement('tr',null,React.createElement('th',null,'السهم'),React.createElement('th',null,'السعر'),React.createElement('th',null,'التغير%'),React.createElement('th',null,'الحجم'))),
+        React.createElement('tbody',null,res.map(function(c){return React.createElement('tr',{key:c.symbol,onClick:function(){goChart(c.symbol)}},
+          React.createElement('td',null,React.createElement('div',{className:'sn'},React.createElement('span',{className:'sn-n'},c.name||c.name_en),React.createElement('span',{className:'sn-s'},c.symbol))),
+          React.createElement('td',{style:{fontWeight:700}},fN(c.price)),React.createElement('td',{className:cc(c.change_percent)},cs(c.change_percent)+fN(c.change_percent)+'%'),
+          React.createElement('td',{style:{color:'var(--text-sec)'}},fV(c.volume))
+        )})))))
+    )
+  );
+}
+
+// ─── CHART PAGE (Candlestick) ───
+function ChartPage({initSym}){
+  var s=useState,s1=s(initSym||''),sym=s1[0],sSym=s1[1];
+  var s2=s(null),data=s2[0],sData=s2[1],s3=s(false),ld=s3[0],sLd=s3[1];
+  var s4=s('1d'),tf=s4[0],sTf=s4[1];
+  var chartRef=useRef(null),chartInst=useRef(null),seriesRef=useRef(null);
+
+  useEffect(function(){if(initSym){sSym(initSym)}},[initSym]);
+
+  function loadChart(symbol,interval){
+    if(!symbol||!symbol.trim())return;
+    sLd(true);
+    Promise.all([StockAPI.quote(symbol.trim()),StockAPI.hist(symbol.trim(),interval||'1d').catch(function(){return{data:[]}})]).then(function(r){
+      sData(r[0]);
+      var hist=r[1].data||r[1].historical||[];
+      renderChart(hist,r[0]);
+      sLd(false);
+    }).catch(function(e){console.error(e);sLd(false)});
+  }
+
+  useEffect(function(){if(initSym)loadChart(initSym,tf)},[initSym]);
+
+  function renderChart(hist,quote){
+    if(!chartRef.current||!hist.length)return;
+    // Destroy old chart
+    if(chartInst.current){try{chartInst.current.remove()}catch(e){}}
+    chartRef.current.innerHTML='';
+
+    var chart=LightweightCharts.createChart(chartRef.current,{
+      width:chartRef.current.offsetWidth,height:300,
+      layout:{background:{type:'solid',color:'#ffffff'},textColor:'#5a6a7a',fontFamily:'Tajawal'},
+      grid:{vertLines:{color:'#f0f0f0'},horzLines:{color:'#f0f0f0'}},
+      rightPriceScale:{borderColor:'#e8ecf0'},
+      timeScale:{borderColor:'#e8ecf0',timeVisible:false},
+      crosshair:{mode:0}
+    });
+    chartInst.current=chart;
+
+    var raw=hist.map(function(d){
+      return{time:d.date||d.timestamp,open:d.open,high:d.high,low:d.low,close:d.close};
+    }).filter(function(d){return d.time&&d.open&&d.high&&d.low&&d.close}).sort(function(a,b){return a.time<b.time?-1:1});
+
+    // Heikin Ashi calculation
+    var candles=[];
+    for(var j=0;j<raw.length;j++){
+      var r=raw[j];
+      var haClose=(r.open+r.high+r.low+r.close)/4;
+      var haOpen=j===0?(r.open+r.close)/2:(candles[j-1].open+candles[j-1].close)/2;
+      var haHigh=Math.max(r.high,haOpen,haClose);
+      var haLow=Math.min(r.low,haOpen,haClose);
+      candles.push({time:r.time,open:haOpen,high:haHigh,low:haLow,close:haClose});
+    }
+
+    if(candles.length>0){
+      var series=chart.addCandlestickSeries({
+        upColor:'#00c853',downColor:'#ff1744',borderDownColor:'#00c853',borderUpColor:'#00c853',
+        wickDownColor:'#ff1744',wickUpColor:'#00c853',
+        borderVisible:false
+      });
+      series.setData(candles);
+      seriesRef.current=series;
+      chart.timeScale().fitContent();
+
+      // Volume
+      var volSeries=chart.addHistogramSeries({
+        color:'#c8922a33',priceFormat:{type:'volume'},priceScaleId:'vol'
+      });
+      chart.priceScale('vol').applyOptions({scaleMargins:{top:0.85,bottom:0}});
+      var volData=hist.map(function(d){
+        return{time:d.date||d.timestamp,value:d.volume||0,color:d.close>=d.open?'rgba(0,200,83,0.3)':'rgba(255,23,68,0.3)'};
+      }).filter(function(d){return d.time}).sort(function(a,b){return a.time<b.time?-1:1});
+      if(volData.length)volSeries.setData(volData);
+    }
+
+    // Resize
+    var ro=new ResizeObserver(function(){if(chartRef.current)chart.applyOptions({width:chartRef.current.offsetWidth})});
+    ro.observe(chartRef.current);
+  }
+
+  function changeTf(iv){sTf(iv);if(sym)loadChart(sym,iv)}
+
+  return React.createElement(React.Fragment,null,
+    React.createElement('div',{className:'stit'},Ic.cht,' الشارت'),
+    React.createElement('div',{style:{display:'flex',gap:8,marginBottom:8}},
+      React.createElement('div',{className:'sbar',style:{flex:1,marginBottom:0}},Ic.srch,React.createElement('input',{placeholder:'أدخل رمز السهم (مثل 1120)...',value:sym,onChange:function(e){sSym(e.target.value)},onKeyDown:function(e){if(e.key==='Enter')loadChart(sym,tf)}})),
+      React.createElement('button',{className:'rbtn',style:{padding:'8px 16px'},onClick:function(){loadChart(sym,tf)}},'عرض')
+    ),
+    React.createElement('div',{className:'tf-btns'},
+      ['1d','1w','1m'].map(function(iv){var labels={'1d':'يومي','1w':'أسبوعي','1m':'شهري'};return React.createElement('button',{key:iv,className:'tf-btn'+(tf===iv?' atf':''),onClick:function(){changeTf(iv)}},labels[iv])})
+    ),
+    ld?React.createElement('div',{className:'ldg'},React.createElement('div',{className:'spin'}),'جاري تحميل الشارت...'):null,
+    React.createElement('div',{id:'chart-box',ref:chartRef}),
+    data?React.createElement(React.Fragment,null,
+      React.createElement('div',{className:'card',style:{padding:12,marginBottom:12}},
+        React.createElement('div',{className:'flx'},
+          React.createElement('div',null,React.createElement('div',{style:{fontSize:18,fontWeight:800}},data.name||data.name_en),React.createElement('div',{style:{fontSize:13,color:'var(--gray)'}},data.symbol)),
+          React.createElement('div',{style:{textAlign:'left'}},React.createElement('div',{style:{fontSize:24,fontWeight:900}},fN(data.price)),React.createElement('div',{className:cc(data.change_percent),style:{fontSize:14}},cs(data.change_percent)+fN(data.change_percent)+'%'))
+        )
+      ),
+      React.createElement('div',{className:'sdg'},
+        [{l:'الافتتاح',v:fN(data.open)},{l:'الأعلى',v:fN(data.high)},{l:'الأدنى',v:fN(data.low)},{l:'الإغلاق السابق',v:fN(data.previous_close)},{l:'الحجم',v:fV(data.volume)},{l:'القيمة',v:fV(data.value)}].map(function(x,i){return React.createElement('div',{key:i,className:'sdi'},React.createElement('div',{className:'sdl'},x.l),React.createElement('div',{className:'sdv'},x.v))})
+      )
+    ):!ld?React.createElement('div',{className:'cs'},Ic.cht,React.createElement('h2',null,'ابحث عن سهم'),React.createElement('p',null,'أدخل رمز السهم وشاهد شارت الشموع اليابانية')):null
+  );
+}
+
+// ─── COMING SOON ───
+function CS({t,d}){return React.createElement('div',{className:'cs'},Ic.bld,React.createElement('h2',null,t),React.createElement('p',null,d))}
+
+// ─── APP ───
+function App(){
+  var s=useState,s1=s('market'),tab=s1[0],sTab=s1[1],s2=s(null),tasi=s2[0],sTasi=s2[1];
+  var s3=s(''),chartSym=s3[0],sChartSym=s3[1];
+  useEffect(function(){StockAPI.summary().then(sTasi).catch(function(){})},[]);
+  function goChart(sym){sChartSym(sym);sTab('chart')}
+  return React.createElement(React.Fragment,null,
+    React.createElement(Hdr,{tasi:tasi}),
+    React.createElement('div',{className:'pg'+(tab==='market'?' act':'')},React.createElement(MarketPage,{goChart:goChart})),
+    React.createElement('div',{className:'pg'+(tab==='screener'?' act':'')},React.createElement(ScreenerPage,{goChart:goChart})),
+    React.createElement('div',{className:'pg'+(tab==='chart'?' act':'')},React.createElement(ChartPage,{initSym:chartSym})),
+    React.createElement('div',{className:'pg'+(tab==='signals'?' act':'')},React.createElement(CS,{t:'التوصيات',d:'قريباً — إنشاء ومتابعة التوصيات ومشاركتها'})),
+    React.createElement('div',{className:'pg'+(tab==='account'?' act':'')},React.createElement(CS,{t:'حسابي',d:'قريباً — المحفظة والمراقبة والتنبيهات'})),
+    React.createElement(Nav,{act:tab,onNav:sTab})
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+</script>
+</body>
+</html>
