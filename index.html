@@ -307,48 +307,52 @@ const { useState, useEffect, useCallback, useMemo, useRef } = React;
 const API_KEY = 'shmk_live_243cd1b92526f7cc5a4dfcb253bbe76b99286c7741741c21';
 const API_BASES = [
   '/api/v1',
-  '/api2/v1',
-  'https://api.sahmk.sa/api/v1',
-  'https://app.sahmk.sa/api/v1'
+  'https://corsproxy.io/?' + encodeURIComponent('https://api.sahmk.sa/api/v1'),
+  'https://api.sahmk.sa/api/v1'
 ];
 
 // ─── API LAYER ──────────────────────────────────────────────
 const StockAPI = {
   _cache: {},
   _cacheTime: {},
-  _ttl: 5 * 60 * 1000, // 5 min cache
-  _baseIndex: 0, // which base URL works
+  _ttl: 5 * 60 * 1000,
+  _baseIndex: 0,
 
   async _fetch(endpoint) {
     const now = Date.now();
     if (this._cache[endpoint] && (now - this._cacheTime[endpoint]) < this._ttl) {
       return this._cache[endpoint];
     }
-    // Try both base URLs
     var lastErr = null;
     for (var i = 0; i < API_BASES.length; i++) {
       var idx = (this._baseIndex + i) % API_BASES.length;
+      var url = API_BASES[idx];
+      // For corsproxy, endpoint goes after the encoded base
+      if (url.includes('corsproxy.io')) {
+        url = 'https://corsproxy.io/?' + encodeURIComponent('https://api.sahmk.sa/api/v1' + endpoint);
+      } else {
+        url = url + endpoint;
+      }
       try {
-        var res = await fetch(API_BASES[idx] + endpoint, {
+        var res = await fetch(url, {
           headers: { 'X-API-Key': API_KEY }
         });
         if (!res.ok) {
           var errBody = await res.json().catch(function(){ return {}; });
-          var errMsg = (errBody && errBody.error && errBody.error.message) || ('HTTP ' + res.status + ' ' + (errBody.error && errBody.error.code || ''));
+          var errMsg = (errBody && errBody.error && errBody.error.message) || ('HTTP ' + res.status);
           throw new Error(errMsg);
         }
         var data = await res.json();
         this._cache[endpoint] = data;
         this._cacheTime[endpoint] = now;
-        this._baseIndex = idx; // remember working base
+        this._baseIndex = idx;
         return data;
       } catch (e) {
         lastErr = e;
-        console.warn('API try ' + API_BASES[idx] + endpoint, e.message);
+        console.warn('API try failed:', url, e.message);
       }
     }
-    console.error('API Error (all bases failed):', endpoint, lastErr);
-    throw lastErr;
+    throw lastErr || new Error('فشل الاتصال بالخادم');
   },
 
   // ملخص السوق
