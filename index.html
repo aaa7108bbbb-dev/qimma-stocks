@@ -305,37 +305,26 @@ const { useState, useEffect, useCallback, useMemo, useRef } = React;
 
 // ─── CONFIG ─────────────────────────────────────────────────
 const API_KEY = 'shmk_live_243cd1b92526f7cc5a4dfcb253bbe76b99286c7741741c21';
-const API_BASES = [
-  '/api/v1',
-  'https://corsproxy.io/?' + encodeURIComponent('https://api.sahmk.sa/api/v1'),
-  'https://api.sahmk.sa/api/v1'
-];
 
 // ─── API LAYER ──────────────────────────────────────────────
 const StockAPI = {
   _cache: {},
   _cacheTime: {},
   _ttl: 5 * 60 * 1000,
-  _baseIndex: 0,
 
   async _fetch(endpoint) {
     const now = Date.now();
     if (this._cache[endpoint] && (now - this._cacheTime[endpoint]) < this._ttl) {
       return this._cache[endpoint];
     }
+    // Try proxy first, then direct
+    var bases = ['/api/v1', 'https://api.sahmk.sa/api/v1'];
     var lastErr = null;
-    for (var i = 0; i < API_BASES.length; i++) {
-      var idx = (this._baseIndex + i) % API_BASES.length;
-      var url = API_BASES[idx];
-      // For corsproxy, endpoint goes after the encoded base
-      if (url.includes('corsproxy.io')) {
-        url = 'https://corsproxy.io/?' + encodeURIComponent('https://api.sahmk.sa/api/v1' + endpoint);
-      } else {
-        url = url + endpoint;
-      }
+    for (var i = 0; i < bases.length; i++) {
       try {
-        var res = await fetch(url, {
-          headers: { 'X-API-Key': API_KEY }
+        var res = await fetch(bases[i] + endpoint, {
+          headers: { 'X-API-Key': API_KEY },
+          mode: i === 0 ? 'same-origin' : 'cors'
         });
         if (!res.ok) {
           var errBody = await res.json().catch(function(){ return {}; });
@@ -345,14 +334,13 @@ const StockAPI = {
         var data = await res.json();
         this._cache[endpoint] = data;
         this._cacheTime[endpoint] = now;
-        this._baseIndex = idx;
         return data;
       } catch (e) {
         lastErr = e;
-        console.warn('API try failed:', url, e.message);
+        console.warn('API fail [' + bases[i] + ']:', e.message);
       }
     }
-    throw lastErr || new Error('فشل الاتصال بالخادم');
+    throw lastErr || new Error('فشل الاتصال');
   },
 
   // ملخص السوق
