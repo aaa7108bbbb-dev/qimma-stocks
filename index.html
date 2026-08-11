@@ -125,8 +125,6 @@ input,select{font-family:var(--font)}
 .sd-item{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:10px;text-align:center}
 .sd-item .sd-label{font-size:10px;color:var(--text-secondary)}
 .sd-item .sd-val{font-size:14px;font-weight:700;margin-top:2px}
-
-.chart-toolbar{display:flex;gap:6px;align-items:center;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none}.chart-toolbar::-webkit-scrollbar{display:none}.chart-pill{white-space:nowrap;border:1px solid var(--card-border);background:var(--card);color:var(--text-secondary);padding:6px 10px;border-radius:18px;font-size:11px;font-weight:600}.chart-pill.active{background:var(--navy);color:#fff;border-color:var(--navy)}.chart-divider{width:1px;height:24px;background:var(--card-border);flex:0 0 auto}
 </style>
 </head>
 <body>
@@ -403,22 +401,113 @@ function ScreenerPage({onSelectStock}){
             React.createElement('thead',null,React.createElement('tr',null,
               React.createElement('th',null,'السهم'),React.createElement('th',null,'السعر'),React.createElement('th',null,'التغير%'),React.createElement('th',null,'الحجم'))),
             React.createElement('tbody',null,results.map(function(c){return React.createElement('tr',{key:c.symbol,onClick:function(){onSelectStock(c.symbol)}},
-              React.createElement('td',null,React.createElement('d// ─── CHART PAGE (Professional Heikin Ashi) ───
-function ChartPage({onSelectStock}){
-  var a=useState(''),sym=a[0],setSym=a[1],b=useState(null),data=b[0],setData=b[1],c=useState(false),loading=c[0],setLoading=c[1],d=useState([]),history=d[0],setHistory=d[1],e=useState('1d'),interval=e[0],setInterval=e[1],f=useState('HA'),mode=f[0],setMode=f[1],g=useState(true),showVolume=g[0],setShowVolume=g[1],h=useState(false),showMA=h[0],setShowMA=h[1],m=useState(false),showMA50=m[0],setShowMA50=m[1],n=useState(false),showMA200=n[0],setShowMA200=n[1];
-  var canvasRef=useRef(null);
-  function loadChart(iv){var symbol=sym.trim();if(!symbol)return;iv=iv||interval;setLoading(true);Promise.all([StockAPI.quote(symbol),StockAPI.historical(symbol,iv).catch(function(){return{data:[]}})]).then(function(r){setData(r[0]);setHistory(r[1].data||[]);setLoading(false)}).catch(function(){setLoading(false)})}
-  function rowsOf(x){return x.map(function(d){return{time:d.time||d.timestamp||d.date||d.datetime||'',open:+d.open,high:+d.high,low:+d.low,close:+d.close,volume:+(d.volume||0)}}).filter(function(d){return isFinite(d.open)&&isFinite(d.high)&&isFinite(d.low)&&isFinite(d.close)})}
-  function HA(r){var o=[];r.forEach(function(d,i){var cl=(d.open+d.high+d.low+d.close)/4,op=i?(o[i-1].open+o[i-1].close)/2:(d.open+d.close)/2;o.push({time:d.time,open:op,high:Math.max(d.high,op,cl),low:Math.min(d.low,op,cl),close:cl,volume:d.volume})});return o}
-  function SMA(r,n){return r.map(function(_,i){if(i<n-1)return null;var s=0;for(var j=i-n+1;j<=i;j++)s+=r[j].close;return s/n})}
-  function dt(v){var d=new Date(v);return isNaN(d)?String(v).slice(0,10):(d.getMonth()+1)+'/'+d.getDate()}
-  useEffect(function(){if(!canvasRef.current||history.length<2)return;var raw=rowsOf(history);if(raw.length<2)return;var r=mode==='HA'?HA(raw):raw,cv=canvasRef.current,rect=cv.getBoundingClientRect(),D=window.devicePixelRatio||1,W=Math.max(320,rect.width),H=370,L=52,R=48,T=18,B=showVolume?72:35;cv.width=W*D;cv.height=H*D;var x=cv.getContext('2d');x.setTransform(D,0,0,D,0,0);x.clearRect(0,0,W,H);var hi=Math.max.apply(null,r.map(function(q){return q.high})),lo=Math.min.apply(null,r.map(function(q){return q.low})),p=(hi-lo)*.06||1;hi+=p;lo-=p;var cw=W-L-R,ch=H-T-B,Y=function(v){return T+(hi-v)/(hi-lo)*ch},X=function(i){return L+i/(r.length-1)*cw};x.font='11px Tajawal';for(var z=0;z<=4;z++){var yy=T+z*ch/4;x.strokeStyle='rgba(136,153,170,.16)';x.beginPath();x.moveTo(L,yy);x.lineTo(W-R,yy);x.stroke();x.fillStyle='#8899aa';x.fillText(fN(hi-(hi-lo)*z/4),3,yy+4)}var step=Math.max(1,Math.floor(r.length/7));x.textAlign='center';r.forEach(function(q,i){if(i%step===0||i===r.length-1){x.fillStyle='#8899aa';x.fillText(dt(q.time),X(i),H-8)}});var bw=Math.max(2,Math.min(14,cw/r.length*.72));r.forEach(function(q,i){var xx=X(i),up=q.close>=q.open;x.strokeStyle=up?'#00c853':'#ff1744';x.fillStyle=up?'#00c853':'#ff1744';x.beginPath();x.moveTo(xx,Y(q.high));x.lineTo(xx,Y(q.low));x.stroke();var bh=Math.max(1,Math.abs(Y(q.close)-Y(q.open)));x.fillRect(xx-bw/2,Math.min(Y(q.open),Y(q.close)),bw,bh)});function drawMA(nv,stroke){var ma=SMA(r,nv),started=false;x.beginPath();ma.forEach(function(v,i){if(v==null)return;if(!started){x.moveTo(X(i),Y(v));started=true}else x.lineTo(X(i),Y(v))});x.strokeStyle=stroke;x.lineWidth=1.7;x.stroke()}
-if(showMA)drawMA(20,'#c8922a');
-if(showMA50)drawMA(50,'#7b61a8');
-if(showMA200)drawMA(200,'#168aad');if(showVolume){var vm=Math.max.apply(null,raw.map(function(q){return q.volume}))||1;raw.forEach(function(q,i){x.fillStyle=q.close>=q.open?'rgba(0,200,83,.30)':'rgba(255,23,68,.30)';x.fillRect(X(i)-bw/2,H-54-(q.volume/vm)*48,bw,(q.volume/vm)*48)});x.fillStyle='#8899aa';x.textAlign='left';x.fillText('حجم التداول',L,H-55)}x.fillStyle='#5a6a7a';x.textAlign='right';x.fillText(mode==='HA'?'Heikin Ashi':'شموع يابانية',W-R,13)},[history,mode,showVolume,showMA,showMA50,showMA200]);
-  return React.createElement(React.Fragment,null,React.createElement('div',{className:'section-title'},I.chart,' الشارت الاحترافي'),React.createElement('div',{style:{display:'flex',gap:8,marginBottom:10}},React.createElement('div',{className:'search-bar',style:{flex:1,marginBottom:0}},I.search,React.createElement('input',{placeholder:'أدخل رمز السهم (مثل 1120)...',value:sym,onChange:function(e){setSym(e.target.value)},onKeyDown:function(e){if(e.key==='Enter')loadChart()}})),React.createElement('button',{className:'refresh-btn',style:{padding:'8px 16px'},onClick:function(){loadChart()}},'عرض')),React.createElement('div',{className:'chart-toolbar'},['1d','1wk','1mo'].map(function(iv){return React.createElement('button',{key:iv,className:'chart-pill '+(interval===iv?'active':''),onClick:function(){setInterval(iv);if(sym.trim())loadChart(iv)}},iv==='1d'?'يومي':iv==='1wk'?'أسبوعي':'شهري')}),React.createElement('span',{className:'chart-divider'}),React.createElement('button',{className:'chart-pill '+(mode==='HA'?'active':''),onClick:function(){setMode('HA')}},'Heikin Ashi'),React.createElement('button',{className:'chart-pill '+(mode==='CANDLE'?'active':''),onClick:function(){setMode('CANDLE')}},'شموع'),React.createElement('button',{className:'chart-pill '+(showMA?'active':''),onClick:function(){setShowMA(function(v){return !v})}},'MA20'),React.createElement('button',{className:'chart-pill '+(showMA50?'active':''),onClick:function(){setShowMA50(function(v){return !v})}},'MA50'),React.createElement('button',{className:'chart-pill '+(showMA200?'active':''),onClick:function(){setShowMA200(function(v){return !v})}},'MA200'),React.createElement('button',{className:'chart-pill '+(showVolume?'active':''),onClick:function(){setShowVolume(function(v){return !v})}},'الحجم')),loading?React.createElement('div',{className:'loading'},React.createElement('div',{className:'spinner'})):data?React.createElement(React.Fragment,null,React.createElement('div',{className:'card',style:{padding:14,marginBottom:12}},React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}},React.createElement('div',null,React.createElement('div',{style:{fontSize:18,fontWeight:800}},data.name||data.name_en),React.createElement('div',{style:{fontSize:12,color:'var(--gray)'}},data.symbol+' · '+(mode==='HA'?'Heikin Ashi':'شموع يابانية'))),React.createElement('div',{style:{textAlign:'left'}},React.createElement('div',{style:{fontSize:24,fontWeight:900}},fN(data.price)),React.createElement('div',{className:cc(data.change_percent),style:{fontSize:13,fontWeight:700}},cs(data.change_percent)+fN(data.change_percent)+'%'))),history.length>1?React.createElement('canvas',{ref:canvasRef,style:{width:'100%',height:370,display:'block',borderRadius:10,background:'#fbfcfd',cursor:'crosshair'}}):React.createElement('div',{style:{textAlign:'center',padding:40,color:'var(--gray)'}},'لا توجد بيانات تاريخية')),React.createElement('div',{className:'sd-grid'},[{l:'الافتتاح',v:fN(data.open)},{l:'الأعلى',v:fN(data.high)},{l:'الأدنى',v:fN(data.low)},{l:'الإغلاق السابق',v:fN(data.previous_close)},{l:'الحجم',v:fV(data.volume)},{l:'القيمة',v:fV(data.value)}].map(function(q,i){return React.createElement('div',{key:i,className:'sd-item'},React.createElement('div',{className:'sd-label'},q.l),React.createElement('div',{className:'sd-val'},q.v))}))):React.createElement('div',{className:'coming-soon'},I.chart,React.createElement('h2',null,'ابحث عن سهم'),React.createElement('p',null,'اختر Heikin Ashi أو الشموع اليابانية وحدد الفترة الزمنية'))
+              React.createElement('td',null,React.createElement('div',{className:'stock-name'},React.createElement('span',{className:'sn-name'},c.name||c.name_en),React.createElement('span',{className:'sn-symbol'},c.symbol))),
+              React.createElement('td',{style:{fontWeight:700}},fN(c.price)),
+              React.createElement('td',{className:cc(c.change_percent)},cs(c.change_percent)+fN(c.change_percent)+'%'),
+              React.createElement('td',{style:{color:'var(--text-secondary)'}},fV(c.volume))
+            )}))
+          ))
+      )
+    )
+  );
 }
-.value)}].map(function(item,i){
+
+// ─── CHART PAGE (Basic) ───
+function ChartPage({onSelectStock}){
+  var s1=useState(''),sym=s1[0],setSym=s1[1];
+  var s2=useState(null),data=s2[0],setData=s2[1];
+  var s3=useState(false),loading=s3[0],setLoading=s3[1];
+  var s4=useState([]),history=s4[0],setHistory=s4[1];
+  var canvasRef=useRef(null);
+
+  function loadChart(){
+    if(!sym.trim())return;
+    setLoading(true);
+    Promise.all([
+      StockAPI.quote(sym.trim()),
+      StockAPI.historical(sym.trim(),'1d').catch(function(){return{data:[]}})
+    ]).then(function(res){
+      setData(res[0]);
+      setHistory(res[1].data||[]);
+      setLoading(false);
+    }).catch(function(){setLoading(false)});
+  }
+
+  // Draw simple chart on canvas
+  useEffect(function(){
+    if(!canvasRef.current||history.length<2)return;
+    var canvas=canvasRef.current;
+    var ctx=canvas.getContext('2d');
+    var w=canvas.width=canvas.offsetWidth*2;
+    var h=canvas.height=200*2;
+    ctx.scale(2,2);
+    var W=canvas.offsetWidth,H=200;
+    ctx.clearRect(0,0,W,H);
+
+    var closes=history.map(function(d){return d.close});
+    var mn=Math.min.apply(null,closes),mx=Math.max.apply(null,closes);
+    var range=mx-mn||1;
+    var pad=20;
+
+    // gradient fill
+    var grad=ctx.createLinearGradient(0,0,0,H);
+    var up=closes[closes.length-1]>=closes[0];
+    grad.addColorStop(0,up?'rgba(0,200,83,0.2)':'rgba(255,23,68,0.2)');
+    grad.addColorStop(1,'rgba(255,255,255,0)');
+
+    ctx.beginPath();
+    closes.forEach(function(c,i){
+      var x=pad+(i/(closes.length-1))*(W-2*pad);
+      var y=pad+((mx-c)/range)*(H-2*pad);
+      if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+    });
+    var lastX=pad+((closes.length-1)/(closes.length-1))*(W-2*pad);
+    ctx.lineTo(lastX,H);ctx.lineTo(pad,H);ctx.closePath();
+    ctx.fillStyle=grad;ctx.fill();
+
+    // line
+    ctx.beginPath();
+    closes.forEach(function(c,i){
+      var x=pad+(i/(closes.length-1))*(W-2*pad);
+      var y=pad+((mx-c)/range)*(H-2*pad);
+      if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+    });
+    ctx.strokeStyle=up?'#00c853':'#ff1744';
+    ctx.lineWidth=2;ctx.stroke();
+
+    // price labels
+    ctx.fillStyle='#8899aa';ctx.font='10px Tajawal';ctx.textAlign='left';
+    ctx.fillText(fN(mx),2,pad);
+    ctx.fillText(fN(mn),2,H-5);
+  },[history]);
+
+  return React.createElement(React.Fragment,null,
+    React.createElement('div',{className:'section-title'},I.chart,' الشارت'),
+    React.createElement('div',{style:{display:'flex',gap:8,marginBottom:12}},
+      React.createElement('div',{className:'search-bar',style:{flex:1,marginBottom:0}},
+        I.search,
+        React.createElement('input',{placeholder:'أدخل رمز السهم (مثل 1120)...',value:sym,onChange:function(e){setSym(e.target.value)},onKeyDown:function(e){if(e.key==='Enter')loadChart()}})
+      ),
+      React.createElement('button',{className:'refresh-btn',style:{padding:'8px 16px'},onClick:loadChart},'عرض')
+    ),
+    loading?React.createElement('div',{className:'loading'},React.createElement('div',{className:'spinner'})):
+    data?React.createElement(React.Fragment,null,
+      React.createElement('div',{className:'card',style:{padding:16,marginBottom:12}},
+        React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}},
+          React.createElement('div',null,
+            React.createElement('div',{style:{fontSize:18,fontWeight:800}},data.name||data.name_en),
+            React.createElement('div',{style:{fontSize:13,color:'var(--gray)'}},data.symbol)
+          ),
+          React.createElement('div',{style:{textAlign:'left'}},
+            React.createElement('div',{style:{fontSize:24,fontWeight:900}},fN(data.price)),
+            React.createElement('div',{className:cc(data.change_percent),style:{fontSize:14}},cs(data.change_percent)+fN(data.change_percent)+'%')
+          )
+        ),
+        history.length>1?React.createElement('canvas',{ref:canvasRef,style:{width:'100%',height:200,borderRadius:8}}):
+          React.createElement('div',{style:{textAlign:'center',padding:40,color:'var(--gray)'}},'لا توجد بيانات تاريخية')
+      ),
+      React.createElement('div',{className:'sd-grid'},
+        [{l:'الافتتاح',v:fN(data.open)},{l:'الأعلى',v:fN(data.high)},{l:'الأدنى',v:fN(data.low)},{l:'الإغلاق السابق',v:fN(data.previous_close)},{l:'الحجم',v:fV(data.volume)},{l:'القيمة',v:fV(data.value)}].map(function(item,i){
           return React.createElement('div',{key:i,className:'sd-item'},
             React.createElement('div',{className:'sd-label'},item.l),
             React.createElement('div',{className:'sd-val'},item.v)
