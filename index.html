@@ -78,6 +78,17 @@ input,select{font-family:var(--font)}
 .pc-t{font-size:13px;font-weight:700}
 .pc-d{font-size:10px;color:var(--text-sec);margin-top:2px}
 .pc-c{font-size:12px;font-weight:700;color:var(--gold);margin-top:4px}
+.sgrid{display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:16px}
+.sc{background:linear-gradient(135deg,#0f1b2d 0%,#1a2d4a 100%);border:1px solid rgba(200,146,42,0.2);border-radius:12px;padding:14px;cursor:pointer;transition:all .2s;display:flex;gap:12px;align-items:center}
+.sc:active{transform:scale(0.98);border-color:var(--gold)}
+.sc.apc{border-color:var(--gold);box-shadow:0 0 12px rgba(200,146,42,0.15)}
+.sc-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.sc-body{flex:1}.sc-t{color:#e0b85c;font-size:14px;font-weight:700}.sc-d{color:#8a95a6;font-size:11px;margin-top:2px}
+.sig-tags{display:flex;flex-wrap:wrap;gap:3px;margin-top:4px}
+.sig-tag{display:inline-block;padding:2px 6px;border-radius:6px;font-size:9px;font-weight:600;background:#1a2332;color:#c8922a;border:1px solid #c8922a22}
+.scr-bar{width:60px;height:5px;border-radius:3px;background:#1a2332;overflow:hidden;display:inline-block;vertical-align:middle;margin-right:4px}
+.scr-fill{height:100%;border-radius:3px}
+.prog-msg{text-align:center;padding:16px;color:var(--gold);font-size:13px;font-weight:600}
 
 .sdg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
 .sdi{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:10px;text-align:center}
@@ -239,9 +250,16 @@ function MarketPage({goChart}){
 
 // ─── SCREENER ───
 function ScreenerPage({goChart}){
-  var s=useState,s1=s(null),ap=s1[0],sAp=s1[1],s2=s([]),res=s2[0],sRes=s2[1],s3=s(false),ld=s3[0],sLd=s3[1];
+  var s=useState;
+  var _1=s(null),ap=_1[0],sAp=_1[1];
+  var _2=s([]),res=_2[0],sRes=_2[1];
+  var _3=s(false),ld=_3[0],sLd=_3[1];
+  var _4=s(''),prog=_4[0],sProg=_4[1];
+  var _5=s(false),isSmart=_5[0],setIsSmart=_5[1];
+
+  // ── Simple preset filters ──
   function run(id){
-    sAp(id);sLd(true);
+    sAp(id);sLd(true);sProg('');setIsSmart(false);sRes([]);
     var p;
     if(id==='gainers')p=StockAPI.gainers(50).then(function(r){return r.gainers||[]});
     else if(id==='losers')p=StockAPI.losers(50).then(function(r){return r.losers||[]});
@@ -252,22 +270,298 @@ function ScreenerPage({goChart}){
     else p=Promise.resolve([]);
     p.then(function(r){sRes(r);sLd(false)}).catch(function(){sLd(false)});
   }
-  var prs=[{id:'gainers',i:'🟢',t:'الأسهم المرتفعة',d:'كل الإيجابية اليوم'},{id:'losers',i:'🔴',t:'الأسهم المنخفضة',d:'كل السلبية اليوم'},{id:'bigUp',i:'🚀',t:'ارتفاع قوي +3%',d:'أسهم ارتفعت أكثر من 3%'},{id:'bigDn',i:'📉',t:'انخفاض قوي -3%',d:'أسهم انخفضت أكثر من 3%'},{id:'vol',i:'📊',t:'الأعلى حجماً',d:'الأكثر تداولاً بالحجم'},{id:'val',i:'💰',t:'الأعلى قيمة',d:'الأكثر تداولاً بالقيمة'}];
 
+  // ── Helper: parse historical to OHLCV array ──
+  function parseHist(h){
+    return(h.data||h.historical||[]).map(function(d){
+      return{time:d.date||d.timestamp,open:+d.open,high:+d.high,low:+d.low,close:+d.close,volume:+d.volume||0};
+    }).filter(function(d){return d.time&&d.close>0}).sort(function(a,b){return a.time<b.time?-1:1});
+  }
+
+  // ── Helper: analyze a stock with indicators ──
+  function analyze(stock,hist){
+    if(hist.length<30)return null;
+    var last=hist[hist.length-1];
+    var sma20=_sma(hist,20),sma50=_sma(hist,Math.min(50,hist.length));
+    var rsi=_rsi(hist,14);
+    var bb=_bb(hist,20,2);
+    var s20=sma20.length?sma20[sma20.length-1].value:last.close;
+    var s50=sma50.length?sma50[sma50.length-1].value:last.close;
+    var rsiV=rsi.length?rsi[rsi.length-1].value:50;
+    // Average volume (20 days)
+    var avgV=0,vCount=Math.min(20,hist.length);
+    for(var i=hist.length-vCount;i<hist.length;i++)avgV+=hist[i].volume;
+    avgV/=vCount;
+    var volR=avgV>0?last.volume/avgV:1;
+    // 52-week high/low
+    var hi52=0,lo52=Infinity;
+    var days252=Math.min(252,hist.length);
+    for(var i=hist.length-days252;i<hist.length;i++){
+      if(hist[i].high>hi52)hi52=hist[i].high;
+      if(hist[i].low<lo52)lo52=hist[i].low;
+    }
+    // Bollinger width
+    var bbW=0;
+    if(bb.upper.length&&bb.lower.length){
+      var bU=bb.upper[bb.upper.length-1].value,bL=bb.lower[bb.lower.length-1].value;
+      var bM=bb.mid[bb.mid.length-1].value;
+      bbW=bM>0?(bU-bL)/bM:0;
+    }
+    // SMA50 crossover check (was below in last 10 days?)
+    var wasBelow50=false;
+    if(sma50.length>10){
+      for(var i=sma50.length-10;i<sma50.length-1;i++){
+        var hIdx=hist.length-(sma50.length-i);
+        if(hIdx>=0&&hist[hIdx].close<sma50[i].value)wasBelow50=true;
+      }
+    }
+    // RSI divergence: price lower lows but RSI higher lows
+    var bullDiv=false;
+    if(rsi.length>20){
+      var r1=rsi.slice(-20,-10),r2=rsi.slice(-10);
+      var h1=hist.slice(-20,-10),h2=hist.slice(-10);
+      var minR1=Math.min.apply(null,r1.map(function(x){return x.value}));
+      var minR2=Math.min.apply(null,r2.map(function(x){return x.value}));
+      var minP1=Math.min.apply(null,h1.map(function(x){return x.low}));
+      var minP2=Math.min.apply(null,h2.map(function(x){return x.low}));
+      if(minP2<=minP1&&minR2>minR1)bullDiv=true;
+    }
+    return{
+      symbol:stock.symbol,name:stock.name||stock.name_en,
+      price:+stock.price||last.close,
+      change_percent:+stock.change_percent||0,
+      volume:last.volume,
+      rsi:rsiV,sma20:s20,sma50:s50,volRatio:volR,
+      hi52:hi52,lo52:lo52,bbWidth:bbW,
+      wasBelow50:wasBelow50,bullDiv:bullDiv,
+      aboveSma20:last.close>s20,aboveSma50:last.close>s50
+    };
+  }
+
+  // ── Smart strategy runner ──
+  function runStrategy(stratId){
+    sAp(stratId);sLd(true);setIsSmart(true);sRes([]);
+    sProg('جاري جلب بيانات السوق...');
+    var fromD=new Date();fromD.setMonth(fromD.getMonth()-12);
+    var from=fromD.toISOString().slice(0,10);
+
+    // Step 1: Fetch market data
+    Promise.all([
+      StockAPI.gainers(50).catch(function(){return{gainers:[]}}),
+      StockAPI.losers(50).catch(function(){return{losers:[]}}),
+      StockAPI.topVol(50).catch(function(){return{stocks:[]}})
+    ]).then(function(mkt){
+      var gainers=mkt[0].gainers||[];
+      var losers=mkt[1].losers||[];
+      var topVol=mkt[2].stocks||[];
+      var volSet={};topVol.forEach(function(s){volSet[s.symbol]=true});
+
+      // Step 2: Select candidates based on strategy
+      var candidates=[];
+      if(stratId==='breakout'){
+        // Positive change + preferably high volume
+        var scored=gainers.map(function(s){
+          var sc=0;
+          if(s.change_percent>=0.5&&s.change_percent<=5)sc+=2;
+          if(volSet[s.symbol])sc+=3;
+          return{s:s,sc:sc};
+        }).filter(function(x){return x.sc>0}).sort(function(a,b){return b.sc-a.sc});
+        candidates=scored.slice(0,20).map(function(x){return x.s});
+      }else if(stratId==='downEnd'){
+        // Losers with moderate decline + high volume = accumulation
+        candidates=losers.filter(function(s){
+          return s.change_percent>=-5&&s.change_percent<0;
+        }).slice(0,20);
+      }else if(stratId==='trendBreak'){
+        // Gainers with strong change = possible trend break
+        candidates=gainers.filter(function(s){
+          return s.change_percent>=0.5;
+        }).slice(0,20);
+      }
+
+      if(!candidates.length){sRes([]);sLd(false);sProg('لا توجد أسهم مطابقة');return null}
+
+      // Step 3: Fetch historical for each candidate
+      sProg('جاري تحليل '+candidates.length+' سهم...');
+      var promises=candidates.map(function(c){
+        return StockAPI.hist(c.symbol,'1d',from).catch(function(){return{data:[]}}).then(function(h){
+          return{stock:c,hist:parseHist(h)};
+        });
+      });
+      return Promise.all(promises).then(function(analyzed){return{stratId:stratId,analyzed:analyzed}});
+    }).then(function(result){
+      if(!result)return;
+      var stratId=result.stratId,analyzed=result.analyzed;
+
+      // Step 4: Score each stock based on strategy
+      var results=[];
+      analyzed.forEach(function(item){
+        var a=analyze(item.stock,item.hist);
+        if(!a)return;
+        var score=0,signals=[];
+
+        if(stratId==='breakout'){
+          // ── انفجار سعري ──
+          // Price above SMA50 (strong trend)
+          if(a.aboveSma50){score+=20;signals.push('فوق المتوسط 50')}
+          if(a.aboveSma20){score+=10;signals.push('فوق المتوسط 20')}
+          // RSI in sweet spot (not overbought)
+          if(a.rsi>=45&&a.rsi<=70){score+=20;signals.push('RSI '+a.rsi.toFixed(0))}
+          // High volume (institutional interest)
+          if(a.volRatio>=1.5){score+=20;signals.push('حجم '+a.volRatio.toFixed(1)+'x')}
+          else if(a.volRatio>=1.2){score+=10;signals.push('حجم '+a.volRatio.toFixed(1)+'x')}
+          // Near 52-week high (breakout territory)
+          if(a.hi52>0&&a.price>=a.hi52*0.93){score+=15;signals.push('قرب قمة 52 أسبوع')}
+          // Bollinger squeeze (volatility contraction = pending explosion)
+          if(a.bbWidth>0&&a.bbWidth<0.08){score+=15;signals.push('بولنجر ضيق (تجميع)')}
+
+        }else if(stratId==='downEnd'){
+          // ── نهاية ترند هابط ──
+          // Price below SMA50 (confirmed downtrend)
+          if(!a.aboveSma50){score+=15;signals.push('تحت المتوسط 50')}
+          // Oversold RSI
+          if(a.rsi<30){score+=25;signals.push('RSI '+a.rsi.toFixed(0)+' تشبع بيعي شديد')}
+          else if(a.rsi<40){score+=15;signals.push('RSI '+a.rsi.toFixed(0)+' تشبع بيعي')}
+          // Volume spike (smart money accumulation)
+          if(a.volRatio>=1.5){score+=20;signals.push('حجم '+a.volRatio.toFixed(1)+'x (تجميع)')}
+          // Bullish divergence (RSI making higher lows while price makes lower lows)
+          if(a.bullDiv){score+=25;signals.push('انفراج إيجابي ✦')}
+          // Near 52-week low (deep value)
+          if(a.lo52>0&&a.price<=a.lo52*1.1){score+=15;signals.push('قرب قاع 52 أسبوع')}
+
+        }else if(stratId==='trendBreak'){
+          // ── اختراق ترند هابط ──
+          // Was below SMA50 recently, now above = fresh crossover
+          if(a.wasBelow50&&a.aboveSma50){score+=30;signals.push('اخترق المتوسط 50 ↑')}
+          else if(a.aboveSma50){score+=10;signals.push('فوق المتوسط 50')}
+          // Above SMA20
+          if(a.aboveSma20){score+=10;signals.push('فوق المتوسط 20')}
+          // RSI above 50 (momentum turning positive)
+          if(a.rsi>50&&a.rsi<75){score+=20;signals.push('RSI '+a.rsi.toFixed(0)+' زخم إيجابي')}
+          // Volume confirmation
+          if(a.volRatio>=1.5){score+=20;signals.push('حجم '+a.volRatio.toFixed(1)+'x تأكيد')}
+          else if(a.volRatio>=1.2){score+=10;signals.push('حجم '+a.volRatio.toFixed(1)+'x')}
+          // Price recovering from lows
+          if(a.hi52>0&&a.lo52>0){
+            var range=a.hi52-a.lo52;
+            var pos=range>0?(a.price-a.lo52)/range:0.5;
+            if(pos>=0.3&&pos<=0.6){score+=10;signals.push('منطقة ارتداد')}
+          }
+        }
+
+        if(score>=30){
+          results.push({
+            symbol:a.symbol,name:a.name,price:a.price,
+            change_percent:a.change_percent,volume:a.volume,
+            rsi:a.rsi,sma50:a.sma50,volRatio:a.volRatio,
+            score:score,signals:signals,
+            aboveSma50:a.aboveSma50,hi52:a.hi52,lo52:a.lo52
+          });
+        }
+      });
+
+      results.sort(function(a,b){return b.score-a.score});
+      sRes(results);sLd(false);sProg('');
+    }).catch(function(e){
+      console.error('Strategy error:',e);
+      sLd(false);sProg('حدث خطأ في التحليل');
+    });
+  }
+
+  // ── Preset filter config ──
+  var prs=[
+    {id:'gainers',i:'🟢',t:'الأسهم المرتفعة',d:'كل الإيجابية اليوم'},
+    {id:'losers',i:'🔴',t:'الأسهم المنخفضة',d:'كل السلبية اليوم'},
+    {id:'bigUp',i:'🚀',t:'ارتفاع قوي +3%',d:'أسهم ارتفعت أكثر من 3%'},
+    {id:'bigDn',i:'📉',t:'انخفاض قوي -3%',d:'أسهم انخفضت أكثر من 3%'},
+    {id:'vol',i:'📊',t:'الأعلى حجماً',d:'الأكثر تداولاً بالحجم'},
+    {id:'val',i:'💰',t:'الأعلى قيمة',d:'الأكثر تداولاً بالقيمة'}
+  ];
+
+  // ── Strategy config ──
+  var strats=[
+    {id:'breakout',icon:'⚡',t:'انفجار سعري',d:'أسهم إيجابية قريبة من الانفجار: فوق المتوسطات، حجم عالي، بولنجر ضيق',gradient:'linear-gradient(135deg,#1a2d1a,#0f2d1a)'},
+    {id:'downEnd',icon:'🔄',t:'نهاية ترند هابط',d:'أسهم في قاع الترند: RSI متشبع بيعياً، انفراج إيجابي، تجميع مؤسسي',gradient:'linear-gradient(135deg,#2d1a1a,#2d1a2a)'},
+    {id:'trendBreak',icon:'📈',t:'اختراق ترند هابط',d:'أسهم اخترقت المتوسط 50 للأعلى مع تأكيد الحجم والزخم',gradient:'linear-gradient(135deg,#1a1a2d,#0f1a3d)'}
+  ];
+
+  // ── Score color ──
+  function scrClr(sc){return sc>=80?'#26a69a':sc>=60?'#c8922a':sc>=40?'#ff9800':'#8a95a6'}
+
+  // ── Render ──
   return React.createElement(React.Fragment,null,
+    // Preset filters
     React.createElement('div',{className:'stit'},Ic.flt,' تصفيات جاهزة'),
-    React.createElement('div',{className:'pgrid'},prs.map(function(p){return React.createElement('div',{key:p.id,className:'pc'+(ap===p.id?' apc':''),onClick:function(){run(p.id)}},React.createElement('div',{className:'pc-i'},p.i),React.createElement('div',{className:'pc-t'},p.t),React.createElement('div',{className:'pc-d'},p.d))})),
-    ap&&React.createElement(React.Fragment,null,
-      React.createElement('div',{className:'stit'},'📋 النتائج ('+res.length+')'),
-      ld?React.createElement('div',{className:'ldg'},React.createElement('div',{className:'spin'})):
+    React.createElement('div',{className:'pgrid'},prs.map(function(p){
+      return React.createElement('div',{key:p.id,className:'pc'+(ap===p.id?' apc':''),onClick:function(){run(p.id)}},
+        React.createElement('div',{className:'pc-i'},p.i),
+        React.createElement('div',{className:'pc-t'},p.t),
+        React.createElement('div',{className:'pc-d'},p.d))
+    })),
+
+    // Smart strategies
+    React.createElement('div',{className:'stit'},Ic.bld,' استراتيجيات ذكية'),
+    React.createElement('div',{className:'sgrid'},strats.map(function(st){
+      return React.createElement('div',{key:st.id,className:'sc'+(ap===st.id?' apc':''),style:{background:st.gradient},onClick:function(){runStrategy(st.id)}},
+        React.createElement('div',{className:'sc-icon'},st.icon),
+        React.createElement('div',{className:'sc-body'},
+          React.createElement('div',{className:'sc-t'},st.t),
+          React.createElement('div',{className:'sc-d'},st.d)))
+    })),
+
+    // Progress message
+    prog?React.createElement('div',{className:'prog-msg'},React.createElement('div',{className:'spin',style:{margin:'0 auto 8px'}}),prog):null,
+
+    // Results
+    ap&&!ld&&res.length>0?React.createElement(React.Fragment,null,
+      React.createElement('div',{className:'stit'},'📋 النتائج (',res.length,')'),
+
+      // Smart strategy results (with indicators)
+      isSmart?React.createElement('div',null,res.map(function(c){
+        return React.createElement('div',{key:c.symbol,className:'card',style:{padding:12,marginBottom:8,cursor:'pointer'},onClick:function(){goChart(c.symbol)}},
+          // Row 1: Name + Score
+          React.createElement('div',{className:'flx',style:{marginBottom:6}},
+            React.createElement('div',null,
+              React.createElement('div',{style:{fontWeight:700,fontSize:14}},c.name),
+              React.createElement('div',{style:{fontSize:11,color:'var(--gray)'}},c.symbol)
+            ),
+            React.createElement('div',{style:{textAlign:'left'}},
+              React.createElement('div',{style:{fontSize:10,color:'var(--gray)',marginBottom:2}},'التقييم'),
+              React.createElement('div',null,
+                React.createElement('span',{className:'scr-bar'},React.createElement('div',{className:'scr-fill',style:{width:Math.min(c.score,100)+'%',background:scrClr(c.score)}})),
+                React.createElement('span',{style:{fontSize:13,fontWeight:800,color:scrClr(c.score)}},c.score)
+              )
+            )
+          ),
+          // Row 2: Price + Change + RSI + Volume
+          React.createElement('div',{style:{display:'flex',gap:12,marginBottom:6,fontSize:12}},
+            React.createElement('div',null,React.createElement('span',{style:{color:'var(--gray)',fontSize:10}},'السعر '),React.createElement('span',{style:{fontWeight:700}},fN(c.price))),
+            React.createElement('div',{className:cc(c.change_percent)},cs(c.change_percent)+fN(c.change_percent)+'%'),
+            React.createElement('div',null,React.createElement('span',{style:{color:'var(--gray)',fontSize:10}},'RSI '),React.createElement('span',{style:{fontWeight:700,color:c.rsi<30?'#26a69a':c.rsi>70?'#ef5350':'#b0b8c8'}},c.rsi.toFixed(0))),
+            React.createElement('div',null,React.createElement('span',{style:{color:'var(--gray)',fontSize:10}},'حجم '),React.createElement('span',{style:{fontWeight:700}},c.volRatio.toFixed(1)+'x'))
+          ),
+          // Row 3: Signal tags
+          React.createElement('div',{className:'sig-tags'},c.signals.map(function(sg,i){
+            return React.createElement('span',{key:i,className:'sig-tag'},sg)
+          }))
+        )
+      })):
+
+      // Simple filter results (table)
       React.createElement('div',{className:'card'},React.createElement('div',{className:'stbl'},React.createElement('table',null,
-        React.createElement('thead',null,React.createElement('tr',null,React.createElement('th',null,'السهم'),React.createElement('th',null,'السعر'),React.createElement('th',null,'التغير%'),React.createElement('th',null,'الحجم'))),
-        React.createElement('tbody',null,res.map(function(c){return React.createElement('tr',{key:c.symbol,onClick:function(){goChart(c.symbol)}},
-          React.createElement('td',null,React.createElement('div',{className:'sn'},React.createElement('span',{className:'sn-n'},c.name||c.name_en),React.createElement('span',{className:'sn-s'},c.symbol))),
-          React.createElement('td',{style:{fontWeight:700}},fN(c.price)),React.createElement('td',{className:cc(c.change_percent)},cs(c.change_percent)+fN(c.change_percent)+'%'),
-          React.createElement('td',{style:{color:'var(--text-sec)'}},fV(c.volume))
-        )})))))
-    )
+        React.createElement('thead',null,React.createElement('tr',null,
+          React.createElement('th',null,'السهم'),React.createElement('th',null,'السعر'),
+          React.createElement('th',null,'التغير%'),React.createElement('th',null,'الحجم'))),
+        React.createElement('tbody',null,res.map(function(c){
+          return React.createElement('tr',{key:c.symbol,onClick:function(){goChart(c.symbol)}},
+            React.createElement('td',null,React.createElement('div',{className:'sn'},
+              React.createElement('span',{className:'sn-n'},c.name||c.name_en),
+              React.createElement('span',{className:'sn-s'},c.symbol))),
+            React.createElement('td',{style:{fontWeight:700}},fN(c.price)),
+            React.createElement('td',{className:cc(c.change_percent)},cs(c.change_percent)+fN(c.change_percent)+'%'),
+            React.createElement('td',{style:{color:'var(--text-sec)'}},fV(c.volume)))
+        })))))
+    ):ap&&!ld&&!res.length&&!prog?React.createElement('div',{className:'cs'},React.createElement('h2',null,'لا توجد نتائج'),React.createElement('p',null,'لم يتم العثور على أسهم مطابقة للمعايير')):null
   );
 }
 
