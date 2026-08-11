@@ -89,6 +89,11 @@ input,select{font-family:var(--font)}
 .scr-bar{width:60px;height:5px;border-radius:3px;background:#1a2332;overflow:hidden;display:inline-block;vertical-align:middle;margin-right:4px}
 .scr-fill{height:100%;border-radius:3px}
 .prog-msg{text-align:center;padding:16px;color:var(--gold);font-size:13px;font-weight:600}
+.sugg-list{position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--card-border);border-radius:0 0 8px 8px;z-index:30;max-height:240px;overflow-y:auto;box-shadow:0 8px 20px rgba(0,0,0,0.15)}
+.sugg-item{padding:10px 12px;cursor:pointer;display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--card-border);font-size:13px;direction:rtl}
+.sugg-item:active{background:var(--gold-dim)}
+.frm-inp{width:100%;padding:8px 10px;border:1px solid var(--card-border);border-radius:8px;background:var(--bg);color:var(--text);font-family:Tajawal;font-size:13px;direction:rtl;box-sizing:border-box}
+.frm-inp:focus{outline:none;border-color:var(--gold)}
 
 .sdg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
 .sdi{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:10px;text-align:center}
@@ -162,6 +167,8 @@ var StockAPI={
   topVal(n,idx){return this._f('/market/value/?limit='+(n||10)+'&index='+(idx||'TASI'))},
   quote(s){return this._f('/quote/'+s+'/')},
   hist(s,iv,from){return this._f('/historical/'+s+'/?interval='+(iv||'1d')+'&from='+(from||'2020-01-01')+'&limit=2000')},
+  allCompanies(mkt){return this._f('/companies/?market='+(mkt||'TASI')+'&limit=500&offset=0')},
+  batchQuotes(syms){return this._f('/quotes/?symbols='+syms.join(','))},
   clear(){this._c={};this._t={}}
 };
 
@@ -211,15 +218,35 @@ function Nav({act,onNav}){
 function MarketPage({goChart}){
   var s=useState,s1=s(true),ld=s1[0],sLd=s1[1],s2=s(null),er=s2[0],sEr=s2[1],s3=s(null),sm=s3[0],sSm=s3[1];
   var s4=s([]),gn=s4[0],sGn=s4[1],s5=s([]),ls=s5[0],sLs=s5[1],s6=s([]),tv=s6[0],sTv=s6[1],s7=s(''),sq=s7[0],sSq=s7[1];
+  var s8=s([]),allStk=s8[0],sAllStk=s8[1],s9=s(true),ldAll=s9[0],sLdAll=s9[1];
   var load=useCallback(function(){
     sLd(true);sEr(null);
     Promise.all([StockAPI.summary(),StockAPI.gainers(10),StockAPI.losers(10),StockAPI.topVol(10)]).then(function(r){
       sSm(r[0]);sGn(r[1].gainers||[]);sLs(r[2].losers||[]);sTv(r[3].stocks||[]);sLd(false);
+      loadAllStocks();
     }).catch(function(e){sEr(e.message);sLd(false)});
   },[]);
+  function loadAllStocks(){
+    sLdAll(true);
+    StockAPI.allCompanies('TASI').then(function(comp){
+      var syms=(comp.results||[]).map(function(c){return c.symbol}).filter(Boolean);
+      var batches=[];
+      for(var i=0;i<syms.length;i+=50)batches.push(syms.slice(i,i+50));
+      return Promise.all(batches.map(function(b){return StockAPI.batchQuotes(b).catch(function(){return{quotes:[]}})}));
+    }).then(function(results){
+      var all=[];
+      results.forEach(function(r){(r.quotes||[]).forEach(function(q){if(q.symbol)all.push(q)})});
+      all.sort(function(a,b){return(a.name||a.name_en||'').localeCompare(b.name||b.name_en||'','ar')});
+      sAllStk(all);sLdAll(false);
+    }).catch(function(e){console.error(e);sLdAll(false)});
+  }
   useEffect(function(){load()},[load]);
 
-  var all=useMemo(function(){var m={};[].concat(gn,ls,tv).forEach(function(s){if(s.symbol)m[s.symbol]=s});var a=Object.values(m);if(sq){var q=sq.toLowerCase();a=a.filter(function(c){return(c.name||'').includes(q)||(c.symbol||'').includes(q)})}return a},[gn,ls,tv,sq]);
+  var all=useMemo(function(){
+    var a=allStk.length?allStk:function(){var m={};[].concat(gn,ls,tv).forEach(function(s){if(s.symbol)m[s.symbol]=s});return Object.values(m)}();
+    if(sq){var q=sq.toLowerCase();a=a.filter(function(c){return(c.name||c.name_ar||c.name_en||'').toLowerCase().includes(q)||(c.symbol||'').includes(q)||(c.name_en||'').toLowerCase().includes(q)})}
+    return a;
+  },[allStk,gn,ls,tv,sq]);
 
   if(ld)return React.createElement('div',{className:'ldg'},React.createElement('div',{className:'spin'}),'جاري تحميل بيانات السوق...');
   if(er)return React.createElement('div',{className:'ldg'},React.createElement('span',{style:{color:'var(--red)'}},'⚠️ '+er),React.createElement('button',{className:'rbtn',onClick:function(){StockAPI.clear();load()}},Ic.ref,' إعادة المحاولة'));
@@ -236,7 +263,7 @@ function MarketPage({goChart}){
     React.createElement('div',{className:'stit'},Ic.td,' الأكثر انخفاضاً'),QC(ls,'🔴 خاسر','dn'),
     React.createElement('div',{className:'stit'},Ic.vol,' الأكثر نشاطاً'),
     React.createElement('div',{className:'qcs'},tv.slice(0,5).map(function(s){return React.createElement('div',{key:s.symbol,className:'qc',onClick:function(){goChart(s.symbol)}},React.createElement('div',{className:'qc-t'},'📊 نشاط'),React.createElement('div',{className:'qc-n'},s.name||s.name_en),React.createElement('div',{className:'qc-p'},fN(s.price)),React.createElement('div',{className:'qc-c',style:{color:'var(--text-sec)'}},fV(s.volume)))})),
-    React.createElement('div',{className:'flx',style:{marginTop:16}},React.createElement('div',{className:'stit',style:{margin:0}},'📋 جميع الأسهم ('+all.length+')'),React.createElement('button',{className:'rbtn',onClick:function(){StockAPI.clear();load()}},Ic.ref,' تحديث')),
+    React.createElement('div',{className:'flx',style:{marginTop:16}},React.createElement('div',{className:'stit',style:{margin:0}},'📋 جميع الأسهم ('+all.length+')'+(ldAll?' ⏳':'')  ),React.createElement('button',{className:'rbtn',onClick:function(){StockAPI.clear();sAllStk([]);load()}},Ic.ref,' تحديث')),
     React.createElement('div',{style:{marginTop:8}},React.createElement('div',{className:'sbar'},Ic.srch,React.createElement('input',{placeholder:'ابحث بالاسم أو الرمز...',value:sq,onChange:function(e){sSq(e.target.value)}}))),
     React.createElement('div',{className:'card'},React.createElement('div',{className:'stbl'},React.createElement('table',null,
       React.createElement('thead',null,React.createElement('tr',null,React.createElement('th',null,'السهم'),React.createElement('th',null,'السعر'),React.createElement('th',null,'التغير%'),React.createElement('th',null,'الحجم'))),
@@ -449,7 +476,8 @@ function ScreenerPage({goChart}){
           }
         }
 
-        if(score>=30){
+        var minScore=stratId==='breakout'?50:30;
+        if(score>=minScore){
           results.push({
             symbol:a.symbol,name:a.name,price:a.price,
             change_percent:a.change_percent,volume:a.volume,
@@ -576,13 +604,18 @@ function _macd(data){var e12=_ema(data,12),e26=_ema(data,26);if(!e26.length)retu
 function ChartPage({initSym}){
   var s=useState;
   var _1=s(initSym||''),sym=_1[0],sSym=_1[1];
+  var _10=s([]),compList=_10[0],sCompList=_10[1];
+  var _11=s([]),sugg=_11[0],setSugg=_11[1];
+  var _12=s(false),showSugg=_12[0],sShowSugg=_12[1];
+  // Load companies list for name search
+  useEffect(function(){StockAPI.allCompanies('TASI').then(function(r){sCompList(r.results||[])}).catch(function(){})},[]);
   var _2=s(null),data=_2[0],sData=_2[1];
   var _3=s(false),ld=_3[0],sLd=_3[1];
   var _4=s('1d'),tf=_4[0],sTf=_4[1];
   var _5=s('1Y'),rng=_5[0],sRng=_5[1];
   var _6=s(null),leg=_6[0],sLeg=_6[1];
   var _7=s(false),showInd=_7[0],sShowInd=_7[1];
-  var _8=s({sma20:true,sma50:true,ema20:false,bb:false,rsi:true,macd:false}),ind=_8[0],sInd=_8[1];
+  var _8=s({ema:true,bb:false,rsi:true,macd:false,vwap:false}),ind=_8[0],sInd=_8[1];
   var chartRef=useRef(null),rsiRef=useRef(null),macdRef=useRef(null);
   var chartInst=useRef(null),rsiInst=useRef(null),macdInst=useRef(null);
 
@@ -671,9 +704,17 @@ function ChartPage({initSym}){
     }
 
     // ── Conditional Indicators ──
-    if(ind.sma20){var d20=_sma(raw,20);if(d20.length)chart.addLineSeries({color:'#2196f3',lineWidth:1.5,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'SMA20'}).setData(d20)}
-    if(ind.sma50){var d50=_sma(raw,50);if(d50.length)chart.addLineSeries({color:'#ff9800',lineWidth:1.5,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'SMA50'}).setData(d50)}
-    if(ind.ema20){var de=_ema(raw,20);if(de.length)chart.addLineSeries({color:'#00bcd4',lineWidth:1.5,lineStyle:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'EMA20'}).setData(de)}
+    // ── EMA Bundle: 5,10,15,20,25,30,50,100 ──
+    if(ind.ema){
+      var emaConf=[{p:5,c:'#ffeb3b'},{p:10,c:'#ffc107'},{p:15,c:'#ff9800'},{p:20,c:'#ff5722'},{p:25,c:'#e91e63'},{p:30,c:'#9c27b0'},{p:50,c:'#2196f3'},{p:100,c:'#00bcd4'}];
+      emaConf.forEach(function(ec){if(raw.length>=ec.p){var ed=_ema(raw,ec.p);if(ed.length)chart.addLineSeries({color:ec.c,lineWidth:ec.p<=20?1:1.5,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'EMA'+ec.p}).setData(ed)}})
+    }
+    // ── VWAP ──
+    if(ind.vwap&&raw.length>1){
+      var vwapD=[],cumVP=0,cumV=0;
+      for(var vi=0;vi<raw.length;vi++){var tp=(raw[vi].high+raw[vi].low+raw[vi].close)/3;cumVP+=tp*raw[vi].volume;cumV+=raw[vi].volume;if(cumV>0)vwapD.push({time:raw[vi].time,value:cumVP/cumV})}
+      if(vwapD.length)chart.addLineSeries({color:'#ff6f00',lineWidth:2,lineStyle:0,priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:false,title:'VWAP'}).setData(vwapD);
+    }
     if(ind.bb){var bb=_bb(raw,20,2);if(bb.upper.length){chart.addLineSeries({color:'rgba(156,39,176,0.5)',lineWidth:1,lineStyle:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false}).setData(bb.upper);chart.addLineSeries({color:'rgba(156,39,176,0.5)',lineWidth:1,lineStyle:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false}).setData(bb.lower);chart.addLineSeries({color:'rgba(156,39,176,0.3)',lineWidth:1,lineStyle:3,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'BB'}).setData(bb.mid)}}
 
     // Volume
@@ -729,9 +770,8 @@ function ChartPage({initSym}){
   var RNG=[{k:'1M',l:'شهر'},{k:'3M',l:'3 أشهر'},{k:'6M',l:'6 أشهر'},{k:'1Y',l:'سنة'},{k:'2Y',l:'سنتين'},{k:'MAX',l:'الكل'}];
   var TFS=[{k:'1d',l:'يومي'},{k:'1w',l:'أسبوعي'},{k:'1m',l:'شهري'}];
   var INDS=[
-    {k:'sma20',l:'SMA 20',c:'#2196f3'},
-    {k:'sma50',l:'SMA 50',c:'#ff9800'},
-    {k:'ema20',l:'EMA 20',c:'#00bcd4'},
+    {k:'ema',l:'EMA متعدد',c:'#ff9800',d:'5·10·15·20·25·30·50·100'},
+    {k:'vwap',l:'VWAP',c:'#ff6f00'},
     {k:'bb',l:'بولنجر',c:'#9c27b0'},
     {k:'rsi',l:'RSI 14',c:'#e040fb'},
     {k:'macd',l:'MACD',c:'#2196f3'}
@@ -745,7 +785,12 @@ function ChartPage({initSym}){
     React.createElement('div',{className:'stit'},Ic.cht,' الشارت'),
     // Search
     React.createElement('div',{style:{display:'flex',gap:8,marginBottom:8}},
-      React.createElement('div',{className:'sbar',style:{flex:1,marginBottom:0}},Ic.srch,React.createElement('input',{placeholder:'أدخل الرمز (مثل 2222)...',value:sym,onChange:function(e){sSym(e.target.value)},onKeyDown:function(e){if(e.key==='Enter')loadChart(sym,tf,rng)}})),
+      React.createElement('div',{className:'sbar',style:{flex:1,marginBottom:0,position:'relative'}},Ic.srch,React.createElement('input',{placeholder:'ابحث بالاسم أو الرمز...',value:sym,onChange:function(e){
+        var v=e.target.value;sSym(v);
+        if(v.length>=1&&compList.length){var q=v.toLowerCase();var f=compList.filter(function(c){return(c.name_ar||'').includes(q)||(c.name_en||'').toLowerCase().includes(q)||(c.symbol||'').includes(q)}).slice(0,8);setSugg(f);sShowSugg(f.length>0)}else{sShowSugg(false)}
+      },onKeyDown:function(e){if(e.key==='Enter'){sShowSugg(false);var found=compList.find(function(c){return c.symbol===sym||(c.name_ar||'').includes(sym)});loadChart(found?found.symbol:sym,tf,rng)}},onFocus:function(){if(sugg.length)sShowSugg(true)}}),
+        showSugg?React.createElement('div',{className:'sugg-list'},sugg.map(function(c){return React.createElement('div',{key:c.symbol,className:'sugg-item',onClick:function(){sSym(c.symbol);sShowSugg(false);loadChart(c.symbol,tf,rng)}},React.createElement('span',{style:{fontWeight:700}},c.symbol),React.createElement('span',{style:{color:'var(--gray)',marginRight:8,fontSize:11}},c.name_ar||c.name_en))})):null
+      ),
       React.createElement('button',{className:'rbtn',style:{padding:'8px 16px'},onClick:function(){loadChart(sym,tf,rng)}},'عرض')
     ),
     // Range bar + indicator icon
@@ -801,6 +846,107 @@ function ChartPage({initSym}){
 // ─── COMING SOON ───
 function CS({t,d}){return React.createElement('div',{className:'cs'},Ic.bld,React.createElement('h2',null,t),React.createElement('p',null,d))}
 
+// ─── SIGNALS PAGE (التوصيات) ───
+function SignalsPage({goChart}){
+  var s=useState;
+  var _1=s(function(){try{return JSON.parse(localStorage.getItem('qimma_signals')||'[]')}catch(e){return[]}}),sigs=_1[0],sSigs=_1[1];
+  var _2=s(false),showForm=_2[0],sShowForm=_2[1];
+  var _3=s({symbol:'',name:'',type:'buy',entry:'',t1:'',t2:'',t3:'',stop:'',notes:''}),form=_3[0],sForm=_3[1];
+  var _4=s('active'),view=_4[0],sView=_4[1];
+
+  function save(arr){sSigs(arr);localStorage.setItem('qimma_signals',JSON.stringify(arr))}
+
+  function addSig(){
+    if(!form.symbol||!form.entry||!form.stop)return;
+    var sig={id:Date.now(),symbol:form.symbol.trim(),name:form.name.trim(),type:form.type,entry:+form.entry,targets:[form.t1?+form.t1:null,form.t2?+form.t2:null,form.t3?+form.t3:null].filter(Boolean),stop:+form.stop,notes:form.notes,date:new Date().toISOString().slice(0,10),status:'active',hitTargets:[]};
+    save([sig].concat(sigs));
+    sForm({symbol:'',name:'',type:'buy',entry:'',t1:'',t2:'',t3:'',stop:'',notes:''});sShowForm(false);
+  }
+
+  function closeSig(id,status){save(sigs.map(function(s){return s.id===id?Object.assign({},s,{status:status}):s}))}
+  function delSig(id){if(confirm('حذف التوصية؟'))save(sigs.filter(function(s){return s.id!==id}))}
+
+  function shareSig(sig){
+    var txt='🏷️ *توصية قمة الأسهم*\n';
+    txt+='━━━━━━━━━━━━━\n';
+    txt+=(sig.type==='buy'?'🟢 شراء':'🔴 بيع')+' | *'+sig.symbol+'* '+(sig.name||'')+'\n';
+    txt+='💰 الدخول: '+sig.entry+'\n';
+    sig.targets.forEach(function(t,i){txt+='🎯 هدف '+(i+1)+': '+t+'\n'});
+    txt+='🛑 وقف الخسارة: '+sig.stop+'\n';
+    if(sig.notes)txt+='📝 '+sig.notes+'\n';
+    txt+='━━━━━━━━━━━━━\n';
+    txt+='📅 '+sig.date+' | قمة الأسهم';
+    window.open('https://wa.me/?text='+encodeURIComponent(txt));
+  }
+
+  var filtered=sigs.filter(function(s){return view==='all'||s.status===view});
+  var inp=function(k,ph,ty){return React.createElement('input',{className:'frm-inp',placeholder:ph,type:ty||'text',value:form[k],onChange:function(e){var n={};for(var x in form)n[x]=form[x];n[k]=e.target.value;sForm(n)}})};
+
+  return React.createElement(React.Fragment,null,
+    React.createElement('div',{className:'flx',style:{marginBottom:12}},
+      React.createElement('div',{className:'stit',style:{margin:0}},Ic.sig,' التوصيات'),
+      React.createElement('button',{className:'rbtn',onClick:function(){sShowForm(!showForm)}},showForm?'✕ إلغاء':'+ توصية جديدة')
+    ),
+    // New signal form
+    showForm?React.createElement('div',{className:'card',style:{padding:14,marginBottom:12}},
+      React.createElement('div',{style:{display:'flex',gap:6,marginBottom:8}},
+        React.createElement('button',{className:'rbtn'+(form.type==='buy'?' ':''),style:{flex:1,background:form.type==='buy'?'var(--green)':'var(--card)',color:form.type==='buy'?'#fff':'var(--text-sec)'},onClick:function(){var n={};for(var x in form)n[x]=form[x];n.type='buy';sForm(n)}},'🟢 شراء'),
+        React.createElement('button',{className:'rbtn',style:{flex:1,background:form.type==='sell'?'var(--red)':'var(--card)',color:form.type==='sell'?'#fff':'var(--text-sec)'},onClick:function(){var n={};for(var x in form)n[x]=form[x];n.type='sell';sForm(n)}},'🔴 بيع')
+      ),
+      React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}},
+        inp('symbol','الرمز (مثل 2222)'),inp('name','اسم الشركة (اختياري)'),
+        inp('entry','سعر الدخول','number'),inp('stop','وقف الخسارة','number'),
+        inp('t1','هدف 1','number'),inp('t2','هدف 2','number'),inp('t3','هدف 3','number')
+      ),
+      React.createElement('div',{style:{marginTop:6}},inp('notes','ملاحظات...')),
+      React.createElement('button',{className:'rbtn',style:{width:'100%',marginTop:8,padding:10},onClick:addSig},'💾 حفظ التوصية')
+    ):null,
+    // View filter
+    React.createElement('div',{style:{display:'flex',gap:6,marginBottom:12}},
+      [{k:'active',l:'نشطة'},{k:'won',l:'ناجحة ✓'},{k:'lost',l:'خاسرة ✕'},{k:'all',l:'الكل'}].map(function(v){
+        return React.createElement('button',{key:v.k,className:'rng-btn'+(view===v.k?' act':''),onClick:function(){sView(v.k)}},v.l)
+      })
+    ),
+    // Signals list
+    !filtered.length?React.createElement('div',{className:'cs'},React.createElement('h2',null,'لا توجد توصيات'),React.createElement('p',null,'اضغط "+ توصية جديدة" لإضافة أول توصية')):
+    filtered.map(function(sig){
+      var pct=sig.entry>0?((sig.targets[0]||sig.entry)-sig.entry)/sig.entry*100:0;
+      var rr=sig.entry>0&&sig.stop>0&&sig.targets.length?(Math.abs(sig.targets[0]-sig.entry)/Math.abs(sig.entry-sig.stop)).toFixed(1):'—';
+      return React.createElement('div',{key:sig.id,className:'card',style:{padding:12,marginBottom:8,borderRight:sig.status==='won'?'3px solid var(--green)':sig.status==='lost'?'3px solid var(--red)':'3px solid var(--gold)'}},
+        React.createElement('div',{className:'flx',style:{marginBottom:6}},
+          React.createElement('div',{style:{display:'flex',alignItems:'center',gap:6}},
+            React.createElement('span',{style:{fontSize:16}},sig.type==='buy'?'🟢':'🔴'),
+            React.createElement('div',null,
+              React.createElement('span',{style:{fontWeight:800,fontSize:14,cursor:'pointer'},onClick:function(){goChart(sig.symbol)}},sig.symbol),
+              sig.name?React.createElement('span',{style:{color:'var(--gray)',fontSize:11,marginRight:4}},sig.name):null
+            )
+          ),
+          React.createElement('div',{style:{fontSize:10,color:'var(--gray)'}},sig.date)
+        ),
+        React.createElement('div',{style:{display:'flex',gap:8,fontSize:12,marginBottom:6,flexWrap:'wrap'}},
+          React.createElement('div',null,'💰 دخول: ',React.createElement('b',null,sig.entry)),
+          sig.targets.map(function(t,i){return React.createElement('div',{key:i},'🎯 هدف'+(i+1)+': ',React.createElement('b',null,t))}),
+          React.createElement('div',null,'🛑 وقف: ',React.createElement('b',{style:{color:'var(--red)'}},sig.stop))
+        ),
+        React.createElement('div',{style:{display:'flex',gap:8,fontSize:11,color:'var(--gray)',marginBottom:8}},
+          React.createElement('span',null,'نسبة الهدف: ',React.createElement('b',{className:'up'},'+'+pct.toFixed(1)+'%')),
+          React.createElement('span',null,'مخاطرة/عائد: ',React.createElement('b',null,rr))
+        ),
+        sig.notes?React.createElement('div',{style:{fontSize:11,color:'var(--gray)',marginBottom:8,padding:'4px 8px',background:'var(--bg)',borderRadius:6}},'📝 '+sig.notes):null,
+        sig.status==='active'?React.createElement('div',{style:{display:'flex',gap:6}},
+          React.createElement('button',{className:'rbtn',style:{flex:1,fontSize:11,padding:6,background:'var(--green)',color:'#fff'},onClick:function(){closeSig(sig.id,'won')}},'✓ تحقق'),
+          React.createElement('button',{className:'rbtn',style:{flex:1,fontSize:11,padding:6,background:'var(--red)',color:'#fff'},onClick:function(){closeSig(sig.id,'lost')}},'✕ وقف'),
+          React.createElement('button',{className:'rbtn',style:{flex:1,fontSize:11,padding:6},onClick:function(){shareSig(sig)}},'📤 واتساب'),
+          React.createElement('button',{className:'rbtn',style:{fontSize:11,padding:6,color:'var(--gray)'},onClick:function(){delSig(sig.id)}},'🗑')
+        ):React.createElement('div',{style:{display:'flex',gap:6}},
+          React.createElement('button',{className:'rbtn',style:{flex:1,fontSize:11,padding:6},onClick:function(){shareSig(sig)}},'📤 واتساب'),
+          React.createElement('button',{className:'rbtn',style:{fontSize:11,padding:6,color:'var(--gray)'},onClick:function(){delSig(sig.id)}},'🗑')
+        )
+      )
+    })
+  );
+}
+
 // ─── APP ───
 function App(){
   var s=useState,s1=s('market'),tab=s1[0],sTab=s1[1],s2=s(null),tasi=s2[0],sTasi=s2[1];
@@ -812,7 +958,7 @@ function App(){
     React.createElement('div',{className:'pg'+(tab==='market'?' act':'')},React.createElement(MarketPage,{goChart:goChart})),
     React.createElement('div',{className:'pg'+(tab==='screener'?' act':'')},React.createElement(ScreenerPage,{goChart:goChart})),
     React.createElement('div',{className:'pg'+(tab==='chart'?' act':'')},React.createElement(ChartPage,{initSym:chartSym})),
-    React.createElement('div',{className:'pg'+(tab==='signals'?' act':'')},React.createElement(CS,{t:'التوصيات',d:'قريباً — إنشاء ومتابعة التوصيات ومشاركتها'})),
+    React.createElement('div',{className:'pg'+(tab==='signals'?' act':'')},React.createElement(SignalsPage,{goChart:goChart})),
     React.createElement('div',{className:'pg'+(tab==='account'?' act':'')},React.createElement(CS,{t:'حسابي',d:'قريباً — المحفظة والمراقبة والتنبيهات'})),
     React.createElement(Nav,{act:tab,onNav:sTab})
   );
