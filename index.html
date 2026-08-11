@@ -142,11 +142,16 @@ var StockAPI = {
   async _fetch(ep) {
     var now = Date.now();
     if (this._cache[ep] && (now - this._cacheTime[ep]) < this._ttl) return this._cache[ep];
-    var bases = ['/api/v1', 'https://api.sahmk.sa/api/v1'];
+    // Try Netlify Function proxy first, then direct
+    var urls = [
+      '/.netlify/functions/proxy?p=' + encodeURIComponent(ep),
+      'https://api.sahmk.sa/api/v1' + ep
+    ];
     var lastErr = null;
-    for (var i = 0; i < bases.length; i++) {
+    for (var i = 0; i < urls.length; i++) {
       try {
-        var r = await fetch(bases[i] + ep, { headers: { 'X-API-Key': API_KEY } });
+        var headers = i === 0 ? {} : { 'X-API-Key': API_KEY };
+        var r = await fetch(urls[i], { headers: headers });
         if (!r.ok) { var e = await r.json().catch(function(){return {}}); throw new Error((e.error && e.error.message) || 'HTTP '+r.status); }
         var d = await r.json();
         this._cache[ep] = d; this._cacheTime[ep] = now;
