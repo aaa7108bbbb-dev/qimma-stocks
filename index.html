@@ -115,7 +115,10 @@ input,select{font-family:var(--font)}
 .rsi-label{color:#e040fb;font-size:10px;padding:2px 8px;background:#131722}
 .chart-legend{position:absolute;top:6px;left:8px;z-index:10;font-size:11px;color:#8a95a6;display:flex;gap:10px;direction:ltr}
 .chart-legend .lg-v{font-weight:700;color:#d1d5db}
-.rng-bar{display:flex;gap:4px;margin:0 0 8px;flex-wrap:wrap;align-items:center}
+.rng-bar{display:flex;gap:6px;margin:0 0 8px;align-items:center}
+.tb-btn{padding:6px 12px;border-radius:10px;font-size:12px;font-weight:700;border:1px solid #2a3547;background:#1a2332;color:#b0b8c8;cursor:pointer;font-family:Tajawal;transition:all .2s}
+.tb-btn.act{background:#c8922a22;border-color:var(--gold);color:var(--gold)}
+.tb-drop{display:flex;gap:4px;flex-wrap:wrap;margin:-4px 0 8px;padding:8px;background:#1a2332;border:1px solid #2a3547;border-radius:10px}
 .rng-btn{padding:5px 12px;border-radius:16px;font-size:11px;font-weight:700;border:1px solid #2a3547;background:#1a2332;color:#8a95a6;cursor:pointer;font-family:Tajawal;transition:all .2s}
 .rng-btn.act{background:var(--gold);color:#fff;border-color:var(--gold)}
 .rng-sep{color:#2a3547;font-size:16px;margin:0 2px}
@@ -240,29 +243,32 @@ function MarketPage({goChart}){
   },[]);
   function loadAllStocks(){
     sLdAll(true);
-    Promise.all([
-      StockAPI.allCompanies('TASI').catch(function(){return{results:[]}}),
-      StockAPI.gainers(500).catch(function(){return{gainers:[]}}),
-      StockAPI.losers(500).catch(function(){return{losers:[]}}),
-      StockAPI.topVol(500).catch(function(){return{stocks:[]}})
-    ]).then(function(r){
-      var companies=r[0].results||[];
-      // Build price map from market endpoints
-      var pm={};
-      (r[1].gainers||[]).concat(r[2].losers||[]).concat(r[3].stocks||[]).forEach(function(s){
-        if(s.symbol&&!pm[s.symbol])pm[s.symbol]=s;
+    StockAPI.allCompanies('TASI').catch(function(){return{results:[]}}).then(function(comp){
+      var companies=comp.results||[];
+      var syms=companies.map(function(c){return c.symbol}).filter(Boolean);
+      // Batch quotes (50 per call) + market endpoints as fallback
+      var batches=[];
+      for(var i=0;i<syms.length;i+=50)batches.push(syms.slice(i,i+50));
+      return Promise.all([
+        Promise.all(batches.map(function(b){return StockAPI.batchQuotes(b).catch(function(){return{quotes:[]}})})),
+        StockAPI.gainers(200).catch(function(){return{gainers:[]}}),
+        StockAPI.losers(200).catch(function(){return{losers:[]}}),
+        StockAPI.topVol(200).catch(function(){return{stocks:[]}})
+      ]).then(function(r){
+        var pm={};
+        // Batch quotes first (most complete)
+        r[0].forEach(function(batch){(batch.quotes||[]).forEach(function(q){if(q&&q.symbol)pm[q.symbol]=q})});
+        // Market endpoints fill gaps
+        (r[1].gainers||[]).concat(r[2].losers||[]).concat(r[3].stocks||[]).forEach(function(s){if(s.symbol&&!pm[s.symbol])pm[s.symbol]=s});
+        var nm={};companies.forEach(function(c){nm[c.symbol]=c});
+        var all=companies.map(function(c){
+          var p=pm[c.symbol];
+          return{symbol:c.symbol,name:c.name_ar||c.name_en||'',name_en:c.name_en||'',sector:c.sector_ar||c.sector_en||c.sector||'',price:p?+p.price:null,change_percent:p?+p.change_percent:null,volume:p?+p.volume:null,value:p?+p.value:null};
+        });
+        Object.keys(pm).forEach(function(sym){if(!nm[sym])all.push(pm[sym])});
+        all.sort(function(a,b){return(a.name||a.name_en||'').localeCompare(b.name||b.name_en||'','ar')});
+        sAllStk(all);sLdAll(false);
       });
-      // Build name map from companies
-      var nm={};companies.forEach(function(c){nm[c.symbol]={name_ar:c.name_ar,name_en:c.name_en}});
-      // Merge: all companies with prices where available
-      var all=companies.map(function(c){
-        var p=pm[c.symbol];
-        return{symbol:c.symbol,name:c.name_ar||c.name_en||'',name_en:c.name_en||'',sector:c.sector_ar||c.sector_en||c.sector||'',price:p?p.price:null,change_percent:p?p.change_percent:null,volume:p?p.volume:null,value:p?p.value:null};
-      });
-      // Add any priced stocks not in companies list
-      Object.keys(pm).forEach(function(sym){if(!nm[sym])all.push(pm[sym])});
-      all.sort(function(a,b){return(a.name||a.name_en||'').localeCompare(b.name||b.name_en||'','ar')});
-      sAllStk(all);sLdAll(false);
     }).catch(function(e){console.error(e);sLdAll(false)});
   }
   useEffect(function(){load()},[load]);
@@ -347,11 +353,12 @@ function MarketPage({goChart}){
     ):ldDet?React.createElement('div',{className:'ldg',style:{padding:12}},React.createElement('div',{className:'spin'}),'جاري تحميل البيانات...'):null,
     // All stocks table
     React.createElement('div',{className:'card'},React.createElement('div',{className:'stbl'},React.createElement('table',null,
-      React.createElement('thead',null,React.createElement('tr',null,React.createElement('th',null,'السهم'),React.createElement('th',null,'السعر'),React.createElement('th',null,'التغير%'),React.createElement('th',null,'الحجم'))),
+      React.createElement('thead',null,React.createElement('tr',null,React.createElement('th',null,'السهم'),React.createElement('th',null,'السعر'),React.createElement('th',null,'التغير%'),React.createElement('th',null,'الحجم'),React.createElement('th',null,'السيولة'))),
       React.createElement('tbody',null,all.map(function(c){return React.createElement('tr',{key:c.symbol,onClick:function(){showDetail(c.symbol)}},
         React.createElement('td',null,React.createElement('div',{className:'sn'},React.createElement('span',{className:'sn-n'},c.name||c.name_en),React.createElement('span',{className:'sn-s'},c.symbol+(sortBy==='sector'&&c.sector?' · '+c.sector:'')))),
         React.createElement('td',{style:{fontWeight:700}},c.price?fN(c.price):'—'),React.createElement('td',{className:cc(c.change_percent)},c.change_percent!=null?cs(c.change_percent)+fN(c.change_percent)+'%':'—'),
-        React.createElement('td',{style:{color:'var(--text-sec)'}},sortBy==='valueDn'&&c.value?fV(c.value):c.volume?fV(c.volume):'—')
+        React.createElement('td',{style:{color:'var(--text-sec)',fontSize:11}},c.volume?fV(c.volume):'—'),
+        React.createElement('td',{style:{color:'var(--gold)',fontSize:11,fontWeight:600}},c.value?fV(c.value):'—')
       )})))))
   );
 }
@@ -724,6 +731,8 @@ function ChartPage({initSym}){
   var _6=s(null),leg=_6[0],sLeg=_6[1];
   var _7=s(false),showInd=_7[0],sShowInd=_7[1];
   var _8=s({ema:true,bb:false,rsi:true,macd:false,vwap:false}),ind=_8[0],sInd=_8[1];
+  var _13=s(false),showTf=_13[0],sShowTf=_13[1];
+  var _14=s(false),showRng=_14[0],sShowRng=_14[1];
   var chartRef=useRef(null),rsiRef=useRef(null),macdRef=useRef(null);
   var chartInst=useRef(null),rsiInst=useRef(null),macdInst=useRef(null);
 
@@ -814,8 +823,8 @@ function ChartPage({initSym}){
     // ── Conditional Indicators ──
     // ── EMA Bundle: 5,10,15,20,25,30,50,100 ──
     if(ind.ema){
-      var emaConf=[{p:5,c:'#ffeb3b'},{p:10,c:'#ffc107'},{p:15,c:'#ff9800'},{p:20,c:'#ff5722'},{p:25,c:'#e91e63'},{p:30,c:'#9c27b0'},{p:50,c:'#2196f3'},{p:100,c:'#00bcd4'}];
-      emaConf.forEach(function(ec){if(raw.length>=ec.p){var ed=_ema(raw,ec.p);if(ed.length)chart.addLineSeries({color:ec.c,lineWidth:ec.p<=20?1:1.5,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'EMA'+ec.p}).setData(ed)}})
+      var emaConf=[{p:10,c:'#ffc107'},{p:15,c:'#ff9800'},{p:20,c:'#ff5722'},{p:25,c:'#e91e63'},{p:30,c:'#9c27b0'},{p:50,c:'#2196f3'},{p:100,c:'#00bcd4'}];
+      emaConf.forEach(function(ec){if(raw.length>=ec.p){var ed=_ema(raw,ec.p);if(ed.length)chart.addLineSeries({color:ec.c,lineWidth:ec.p<=25?1:1.5,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false}).setData(ed)}})
     }
     // ── VWAP ──
     if(ind.vwap&&raw.length>1){
@@ -876,7 +885,9 @@ function ChartPage({initSym}){
   function togInd(key){var n={};for(var k in ind)n[k]=ind[k];n[key]=!n[key];sInd(n);if(sym)setTimeout(function(){loadChart(sym,tf,rng)},50)}
 
   var RNG=[{k:'1M',l:'شهر'},{k:'3M',l:'3 أشهر'},{k:'6M',l:'6 أشهر'},{k:'1Y',l:'سنة'},{k:'2Y',l:'سنتين'},{k:'MAX',l:'الكل'}];
-  var TFS=[{k:'1d',l:'يومي'},{k:'1w',l:'أسبوعي'},{k:'1m',l:'شهري'}];
+  var TFS=[{k:'60m',l:'ساعة'},{k:'1d',l:'يومي'},{k:'1w',l:'أسبوعي'},{k:'1m',l:'شهري'}];
+  var rngLabel=RNG.find(function(r){return r.k===rng});
+  var tfLabel=TFS.find(function(t){return t.k===tf});
   var INDS=[
     {k:'ema',l:'EMA متعدد',c:'#ff9800',d:'5·10·15·20·25·30·50·100'},
     {k:'vwap',l:'VWAP',c:'#ff6f00'},
@@ -901,14 +912,16 @@ function ChartPage({initSym}){
       ),
       React.createElement('button',{className:'rbtn',style:{padding:'8px 16px'},onClick:function(){loadChart(sym,tf,rng)}},'عرض')
     ),
-    // Range bar + indicator icon
+    // Compact toolbar: 3 toggle buttons
     React.createElement('div',{className:'rng-bar'},
-      RNG.map(function(r){return React.createElement('button',{key:r.k,className:'rng-btn'+(rng===r.k?' act':''),onClick:function(){changeRange(r.k)}},r.l)}),
-      React.createElement('span',{className:'rng-sep'},'│'),
-      TFS.map(function(t){return React.createElement('button',{key:t.k,className:'tf2-btn'+(tf===t.k?' act':''),onClick:function(){changeTf(t.k)}},t.l)}),
-      React.createElement('span',{className:'rng-sep'}),
-      React.createElement('button',{className:'ind-icon'+(showInd?' act':''),onClick:function(){sShowInd(!showInd)},title:'المؤشرات الفنية'},indIcon,indCount>0?React.createElement('span',{className:'ind-badge'},indCount):null)
+      React.createElement('button',{className:'tb-btn'+(showRng?' act':''),onClick:function(){sShowRng(!showRng);sShowTf(false);sShowInd(false)}},'📅 '+(rngLabel?rngLabel.l:'سنة')),
+      React.createElement('button',{className:'tb-btn'+(showTf?' act':''),onClick:function(){sShowTf(!showTf);sShowRng(false);sShowInd(false)}},'🕐 '+(tfLabel?tfLabel.l:'يومي')),
+      React.createElement('button',{className:'ind-icon'+(showInd?' act':''),onClick:function(){sShowInd(!showInd);sShowRng(false);sShowTf(false)},title:'المؤشرات'},indIcon,indCount>0?React.createElement('span',{className:'ind-badge'},indCount):null)
     ),
+    // Dropdown: Range period
+    showRng?React.createElement('div',{className:'tb-drop'},RNG.map(function(r){return React.createElement('button',{key:r.k,className:'rng-btn'+(rng===r.k?' act':''),onClick:function(){changeRange(r.k);sShowRng(false)}},r.l)})):null,
+    // Dropdown: Timeframe
+    showTf?React.createElement('div',{className:'tb-drop'},TFS.map(function(t){return React.createElement('button',{key:t.k,className:'rng-btn'+(tf===t.k?' act':''),onClick:function(){changeTf(t.k);sShowTf(false)}},t.l)})):null,
     // Indicator panel (toggleable)
     showInd?React.createElement('div',{className:'ind-panel'},
       INDS.map(function(b){return React.createElement('div',{key:b.k,className:'ind-row',onClick:function(){togInd(b.k)}},
