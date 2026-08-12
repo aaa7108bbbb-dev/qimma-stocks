@@ -492,6 +492,11 @@ function ScreenerPage({goChart}){
         candidates=gainers.filter(function(s){
           return s.change_percent>=0.5;
         }).slice(0,20);
+      }else if(stratId==='firstGreen'){
+        // Today's gainers = green candle today (candidates for first green after reds)
+        candidates=gainers.filter(function(s){
+          return s.change_percent>0;
+        }).slice(0,30);
       }
 
       if(!candidates.length){sRes([]);sLd(false);sProg('لا توجد أسهم مطابقة');return null}
@@ -562,6 +567,42 @@ function ScreenerPage({goChart}){
             var pos=range>0?(a.price-a.lo52)/range:0.5;
             if(pos>=0.3&&pos<=0.6){score+=10;signals.push('منطقة ارتداد')}
           }
+        }else if(stratId==='firstGreen'){
+          // ── أول شمعة خضراء بعد سلسلة حمراء ──
+          var hist=item.hist;
+          if(hist.length>=5){
+            var lastGreen=hist[hist.length-1].close>hist[hist.length-1].open;
+            // Count consecutive red candles before today
+            var redCount=0;
+            for(var ri=hist.length-2;ri>=0;ri--){
+              if(hist[ri].close<hist[ri].open)redCount++;
+              else break;
+            }
+            if(lastGreen&&redCount>=3){
+              // More reds = stronger reversal signal (max 40 pts)
+              score+=Math.min(40,redCount*7);
+              signals.push(redCount+' شموع حمراء ثم 🟢');
+              // RSI oversold = stronger
+              if(a.rsi<30){score+=25;signals.push('RSI '+a.rsi.toFixed(0)+' تشبع بيعي شديد')}
+              else if(a.rsi<40){score+=15;signals.push('RSI '+a.rsi.toFixed(0)+' تشبع بيعي')}
+              else if(a.rsi<50){score+=5;signals.push('RSI '+a.rsi.toFixed(0))}
+              // Volume spike on green candle = conviction
+              if(a.volRatio>=2){score+=20;signals.push('حجم '+a.volRatio.toFixed(1)+'x قوي')}
+              else if(a.volRatio>=1.3){score+=10;signals.push('حجم '+a.volRatio.toFixed(1)+'x')}
+              // Bullish engulfing: green body > previous red body
+              var greenBody=Math.abs(hist[hist.length-1].close-hist[hist.length-1].open);
+              var prevRedBody=Math.abs(hist[hist.length-2].close-hist[hist.length-2].open);
+              if(greenBody>prevRedBody*1.2){score+=15;signals.push('ابتلاع صعودي')}
+              // Near 52-week low = deep value reversal
+              if(a.lo52>0&&a.price<=a.lo52*1.1){score+=15;signals.push('قرب قاع 52 أسبوع')}
+              // Total decline during red streak
+              if(hist.length>redCount+1){
+                var preRedPrice=hist[hist.length-2-redCount].close;
+                var decline=((hist[hist.length-2].close-preRedPrice)/preRedPrice*100).toFixed(1);
+                signals.push('هبط '+decline+'% ثم ارتد');
+              }
+            }
+          }
         }
 
         var minScore=stratId==='breakout'?50:30;
@@ -625,7 +666,8 @@ function ScreenerPage({goChart}){
   var strats=[
     {id:'breakout',icon:'⚡',t:'انفجار سعري',d:'أسهم إيجابية قريبة من الانفجار: فوق المتوسطات، حجم عالي، بولنجر ضيق',gradient:'linear-gradient(135deg,#1a2d1a,#0f2d1a)'},
     {id:'downEnd',icon:'🔄',t:'نهاية ترند هابط',d:'أسهم في قاع الترند: RSI متشبع بيعياً، انفراج إيجابي، تجميع مؤسسي',gradient:'linear-gradient(135deg,#2d1a1a,#2d1a2a)'},
-    {id:'trendBreak',icon:'📈',t:'اختراق ترند هابط',d:'أسهم اخترقت المتوسط 50 للأعلى مع تأكيد الحجم والزخم',gradient:'linear-gradient(135deg,#1a1a2d,#0f1a3d)'}
+    {id:'trendBreak',icon:'📈',t:'اختراق ترند هابط',d:'أسهم اخترقت المتوسط 50 للأعلى مع تأكيد الحجم والزخم',gradient:'linear-gradient(135deg,#1a1a2d,#0f1a3d)'},
+    {id:'firstGreen',icon:'🟢',t:'أول شمعة خضراء',d:'أسهم سجلت أول إغلاق أخضر بعد سلسلة شموع حمراء — إشارة ارتداد',gradient:'linear-gradient(135deg,#0d2d0d,#1a3d1a)'}
   ];
 
   // ── Score color ──
