@@ -364,6 +364,76 @@ function MarketPage({goChart}){
 }
 
 // ─── SCREENER ───
+// ─── SHARED CHART RENDERER ───
+function renderFullChart(el,rsiEl,hist,opts){
+  opts=opts||{};if(!el||!hist||hist.length<10)return null;
+  el.innerHTML='';if(rsiEl)rsiEl.innerHTML='';
+  var chart=LightweightCharts.createChart(el,{
+    width:el.offsetWidth,height:opts.h||350,
+    layout:{background:{type:'solid',color:'#131722'},textColor:'#b0b8c8',fontFamily:'Tajawal',fontSize:10},
+    grid:{vertLines:{color:'#1c2a3a'},horzLines:{color:'#1c2a3a'}},
+    rightPriceScale:{borderColor:'#2a3547',scaleMargins:{top:0.05,bottom:0.15}},
+    timeScale:{borderColor:'#2a3547',timeVisible:false,rightOffset:5,minBarSpacing:3},
+    crosshair:{mode:0,vertLine:{color:'#4a5568',style:3},horzLine:{color:'#4a5568',style:3}},
+    watermark:opts.name?{visible:true,text:opts.name.substring(0,15),color:'rgba(200,146,42,0.06)',fontSize:36,fontFamily:'Tajawal',fontWeight:'bold',horzAlign:'center',vertAlign:'center'}:{visible:false}
+  });
+  var raw=hist;
+  // Real OHLC candles (not Heikin Ashi — shows actual prices)
+  var cs=chart.addCandlestickSeries({upColor:'#26a69a',downColor:'#ef5350',borderUpColor:'#26a69a',borderDownColor:'#ef5350',wickUpColor:'#26a69a',wickDownColor:'#ef5350'});
+  cs.setData(raw);
+  // Pivots
+  var pLen=Math.max(3,Math.min(12,Math.floor(raw.length/25)));
+  var mk=[];for(var i=pLen;i<raw.length-pLen;i++){var isH=true,isL=true;for(var j2=i-pLen;j2<=i+pLen;j2++){if(j2===i)continue;if(raw[j2].high>=raw[i].high)isH=false;if(raw[j2].low<=raw[i].low)isL=false}if(isH)mk.push({time:raw[i].time,position:'aboveBar',shape:'arrowDown',color:'#ef5350',text:raw[i].high.toFixed(2)});if(isL)mk.push({time:raw[i].time,position:'belowBar',shape:'arrowUp',color:'#26a69a',text:raw[i].low.toFixed(2)})}
+  if(mk.length)cs.setMarkers(mk.sort(function(a,b){return a.time<b.time?-1:1}));
+  // EMA
+  var emaP=[{p:10,c:'#ffc107'},{p:20,c:'#ff5722'},{p:30,c:'#9c27b0'},{p:50,c:'#2196f3'},{p:100,c:'#00bcd4'}];
+  emaP.forEach(function(ec){if(raw.length>=ec.p){var ed=_ema(raw,ec.p);if(ed.length)chart.addLineSeries({color:ec.c,lineWidth:ec.p<=25?1:1.5,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false}).setData(ed)}});
+  // Volume
+  var vs=chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:'vol'});
+  chart.priceScale('vol').applyOptions({scaleMargins:{top:0.85,bottom:0}});
+  vs.setData(raw.map(function(d){return{time:d.time,value:d.volume,color:d.close>=d.open?'rgba(38,166,154,0.25)':'rgba(239,83,80,0.25)'}}));
+  // RSI
+  if(rsiEl){
+    var rc=LightweightCharts.createChart(rsiEl,{width:rsiEl.offsetWidth,height:80,layout:{background:{type:'solid',color:'#131722'},textColor:'#8a95a6',fontFamily:'Tajawal',fontSize:9},grid:{vertLines:{color:'#1c2a3a'},horzLines:{color:'#1c2a3a'}},rightPriceScale:{borderColor:'#2a3547',scaleMargins:{top:0.1,bottom:0.1}},timeScale:{visible:false},crosshair:{mode:0}});
+    var rsiD=_rsi(raw,14);
+    if(rsiD.length){rc.addLineSeries({color:'#e040fb',lineWidth:1.5,priceLineVisible:false,lastValueVisible:true}).setData(rsiD);rc.addLineSeries({color:'rgba(239,83,80,0.3)',lineWidth:1,lineStyle:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false}).setData(rsiD.map(function(d){return{time:d.time,value:70}}));rc.addLineSeries({color:'rgba(38,166,154,0.3)',lineWidth:1,lineStyle:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false}).setData(rsiD.map(function(d){return{time:d.time,value:30}}))}
+    chart.timeScale().subscribeVisibleLogicalRangeChange(function(range){if(range)rc.timeScale().setVisibleLogicalRange(range)});
+  }
+  chart.timeScale().fitContent();
+  var ro=new ResizeObserver(function(){chart.applyOptions({width:el.offsetWidth})});ro.observe(el);
+  return function(){try{chart.remove()}catch(e){}ro.disconnect()};
+}
+
+// ─── STRATEGY RESULT CARD WITH FULL CHART ───
+function StratResult(props){
+  var c=props.stock,goChart=props.goChart;
+  var chartRef=useRef(null),rsiRef=useRef(null),cleanupRef=useRef(null);
+  function scrClr(sc){return sc>=80?'#26a69a':sc>=60?'#c8922a':sc>=40?'#ff9800':'#8a95a6'}
+  useEffect(function(){
+    if(chartRef.current&&c.histData&&c.histData.length>10){
+      cleanupRef.current=renderFullChart(chartRef.current,rsiRef.current,c.histData,{h:350,name:c.name});
+    }
+    return function(){if(cleanupRef.current)cleanupRef.current()};
+  },[]);
+  return React.createElement('div',{className:'card',style:{padding:0,marginBottom:12,overflow:'hidden',borderRadius:12}},
+    React.createElement('div',{style:{padding:'10px 12px',cursor:'pointer',display:'flex',justifyContent:'space-between',alignItems:'center'},onClick:function(){goChart(c.symbol)}},
+      React.createElement('div',null,React.createElement('span',{style:{fontWeight:800,fontSize:14}},c.name),React.createElement('span',{style:{color:'var(--gray)',fontSize:10,marginRight:4}},c.symbol)),
+      React.createElement('div',{style:{textAlign:'left',display:'flex',alignItems:'center',gap:8}},
+        React.createElement('div',null,React.createElement('div',{style:{fontWeight:800,fontSize:14}},fN(c.price)),React.createElement('div',{className:cc(c.change_percent),style:{fontSize:11}},cs(c.change_percent)+fN(c.change_percent)+'%')),
+        React.createElement('div',{style:{textAlign:'center'}},React.createElement('span',{className:'scr-bar',style:{width:40}},React.createElement('div',{className:'scr-fill',style:{width:Math.min(c.score,100)+'%',background:scrClr(c.score)}})),React.createElement('div',{style:{fontSize:11,fontWeight:800,color:scrClr(c.score)}},c.score))
+      )
+    ),
+    React.createElement('div',{style:{display:'flex',gap:8,padding:'0 12px 6px',fontSize:10,flexWrap:'wrap'}},
+      React.createElement('span',{style:{color:'var(--gray)'}},'RSI ',React.createElement('b',{style:{color:c.rsi<30?'#26a69a':c.rsi>70?'#ef5350':'#b0b8c8'}},c.rsi.toFixed(0))),
+      React.createElement('span',{style:{color:'var(--gray)'}},'حجم ',React.createElement('b',null,c.volRatio.toFixed(1)+'x')),
+      c.signals.slice(0,4).map(function(sg,i){return React.createElement('span',{key:i,className:'sig-tag'},sg)})
+    ),
+    React.createElement('div',{ref:chartRef,style:{width:'100%',height:350}}),
+    React.createElement('div',{style:{background:'#131722',padding:'2px 8px',fontSize:9,color:'#e040fb'}},'RSI (14)'),
+    React.createElement('div',{ref:rsiRef,style:{width:'100%',height:80}})
+  );
+}
+
 function ScreenerPage({goChart}){
   var s=useState;
   var _1=s({}),sr=_1[0],sSr=_1[1]; // {stratId: {ld,results,err}}
@@ -429,7 +499,7 @@ function ScreenerPage({goChart}){
         else if(stratId==='trendBreak'){if(a.wasBelow50&&a.aboveSma50){score+=30;signals.push('اخترق المتوسط 50 ↑')}else if(a.aboveSma50){score+=10;signals.push('فوق المتوسط 50')}if(a.aboveSma20){score+=10;signals.push('فوق المتوسط 20')}if(a.rsi>50&&a.rsi<75){score+=20;signals.push('RSI '+a.rsi.toFixed(0))}if(a.volRatio>=1.5){score+=20;signals.push('حجم '+a.volRatio.toFixed(1)+'x')}else if(a.volRatio>=1.2){score+=10;signals.push('حجم '+a.volRatio.toFixed(1)+'x')}if(a.hi52>0&&a.lo52>0){var rng2=a.hi52-a.lo52;var pos2=rng2>0?(a.price-a.lo52)/rng2:0.5;if(pos2>=0.3&&pos2<=0.6){score+=10;signals.push('منطقة ارتداد')}}}
         else if(stratId==='firstGreen'){var hist2=item.hist;if(hist2.length>=5){var lastG=hist2[hist2.length-1].close>hist2[hist2.length-1].open;var rc=0;for(var ri=hist2.length-2;ri>=0;ri--){if(hist2[ri].close<hist2[ri].open)rc++;else break}if(lastG&&rc>=3){score+=Math.min(40,rc*7);signals.push(rc+' حمراء ثم 🟢');if(a.rsi<30){score+=25;signals.push('RSI '+a.rsi.toFixed(0))}else if(a.rsi<40){score+=15;signals.push('RSI '+a.rsi.toFixed(0))}if(a.volRatio>=2){score+=20;signals.push('حجم '+a.volRatio.toFixed(1)+'x')}else if(a.volRatio>=1.3){score+=10;signals.push('حجم '+a.volRatio.toFixed(1)+'x')}var gb=Math.abs(hist2[hist2.length-1].close-hist2[hist2.length-1].open);var prb=Math.abs(hist2[hist2.length-2].close-hist2[hist2.length-2].open);if(gb>prb*1.2){score+=15;signals.push('ابتلاع صعودي')}if(a.lo52>0&&a.price<=a.lo52*1.1){score+=15;signals.push('قرب قاع 52')}}}}
         var minSc=stratId==='breakout'?50:30;
-        if(score>=minSc){results.push({symbol:a.symbol,name:a.name,price:a.price,change_percent:a.change_percent,rsi:a.rsi,volRatio:a.volRatio,score:score,signals:signals,spark:item.hist.slice(-60).map(function(d){return d.close})})}
+        if(score>=minSc){results.push({symbol:a.symbol,name:a.name,price:a.price,change_percent:a.change_percent,rsi:a.rsi,volRatio:a.volRatio,score:score,signals:signals,histData:item.hist})}
       });
       results.sort(function(a,b){return b.score-a.score});
       // Auto-signal for breakout 90+
@@ -477,33 +547,10 @@ function ScreenerPage({goChart}){
           mkt&&!data.ld?React.createElement('button',{style:{background:'none',border:'none',color:'var(--gold)',fontSize:14,cursor:'pointer'},onClick:function(){runOne(st.id,mkt.g,mkt.l,mkt.v)}},'⟳'):null
         ),
         // Results
+        // Results with full charts
         data.results.length?React.createElement('div',{style:{marginBottom:16}},
-          data.results.map(function(c){
-            return React.createElement('div',{key:c.symbol,className:'card',style:{padding:10,marginBottom:4,cursor:'pointer'},onClick:function(){goChart(c.symbol)}},
-              React.createElement('div',{style:{display:'flex',gap:8,alignItems:'flex-start'}},
-                // Sparkline
-                React.createElement('div',{style:{flexShrink:0}},React.createElement(Spark,{data:c.spark,w:120,h:50})),
-                // Info
-                React.createElement('div',{style:{flex:1,minWidth:0}},
-                  React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:2}},
-                    React.createElement('div',null,
-                      React.createElement('span',{style:{fontWeight:700,fontSize:13}},c.name),
-                      React.createElement('span',{style:{color:'var(--gray)',fontSize:10,marginRight:4}},c.symbol)
-                    ),
-                    React.createElement('div',{style:{textAlign:'left'}},
-                      React.createElement('span',{style:{fontWeight:800,fontSize:13}},fN(c.price)),
-                      React.createElement('span',{className:cc(c.change_percent),style:{fontSize:10,marginRight:4}},cs(c.change_percent)+fN(c.change_percent)+'%')
-                    )
-                  ),
-                  React.createElement('div',{style:{display:'flex',gap:6,fontSize:10,color:'var(--gray)',marginBottom:3}},
-                    React.createElement('span',null,'RSI ',React.createElement('b',{style:{color:c.rsi<30?'#26a69a':c.rsi>70?'#ef5350':'#b0b8c8'}},c.rsi.toFixed(0))),
-                    React.createElement('span',null,'حجم ',React.createElement('b',null,c.volRatio.toFixed(1)+'x')),
-                    React.createElement('span',null,React.createElement('span',{className:'scr-bar',style:{width:40}},React.createElement('div',{className:'scr-fill',style:{width:Math.min(c.score,100)+'%',background:scrClr(c.score)}})),React.createElement('b',{style:{color:scrClr(c.score)}},c.score))
-                  ),
-                  React.createElement('div',{className:'sig-tags'},c.signals.slice(0,4).map(function(sg,i){return React.createElement('span',{key:i,className:'sig-tag'},sg)}))
-                )
-              )
-            )
+          data.results.slice(0,5).map(function(c){
+            return React.createElement(StratResult,{key:c.symbol,stock:c,goChart:goChart})
           })
         ):data.ld?null:React.createElement('div',{style:{textAlign:'center',padding:8,color:'var(--gray)',fontSize:11,marginBottom:12}},'لا توجد أسهم مطابقة')
       )
@@ -605,12 +652,9 @@ function ChartPage({initSym}){
     var raw=hist.map(function(d){return{time:d.date||d.timestamp,open:+d.open,high:+d.high,low:+d.low,close:+d.close,volume:+d.volume||0}}).filter(function(d){return d.time&&d.open}).sort(function(a,b){return a.time<b.time?-1:1});
     if(!raw.length)return;
 
-    // Heikin Ashi
-    var ha=[];
-    for(var j=0;j<raw.length;j++){var r=raw[j];var hc=(r.open+r.high+r.low+r.close)/4;var ho=j===0?(r.open+r.close)/2:(ha[j-1].open+ha[j-1].close)/2;ha.push({time:r.time,open:ho,high:Math.max(r.high,ho,hc),low:Math.min(r.low,ho,hc),close:hc})}
-
+    // Real OHLC candles (actual prices)
     var cSeries=chart.addCandlestickSeries({upColor:'#26a69a',downColor:'#ef5350',borderUpColor:'#26a69a',borderDownColor:'#ef5350',wickUpColor:'#26a69a',wickDownColor:'#ef5350'});
-    cSeries.setData(ha);
+    cSeries.setData(raw);
 
     // Pivots
     var pLen=Math.max(3,Math.min(12,Math.floor(raw.length/25)));
