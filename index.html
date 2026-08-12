@@ -243,8 +243,8 @@ function MarketPage({goChart}){
   },[]);
   function loadAllStocks(){
     sLdAll(true);
-    StockAPI.allCompanies('TASI').catch(function(){return{results:[]}}).then(function(comp){
-      var companies=comp.results||[];
+    Promise.all([StockAPI.allCompanies('TASI').catch(function(){return{results:[]}}),StockAPI.allCompanies('nomu').catch(function(){return{results:[]}})]).then(function(both){
+      var companies=(both[0].results||[]).concat(both[1].results||[]);
       var syms=companies.map(function(c){return c.symbol}).filter(Boolean);
       // Batch quotes (50 per call) + market endpoints as fallback
       var batches=[];
@@ -573,7 +573,7 @@ function ChartPage({initSym}){
   var _11=s([]),sugg=_11[0],setSugg=_11[1];
   var _12=s(false),showSugg=_12[0],sShowSugg=_12[1];
   // Load companies list for name search
-  useEffect(function(){StockAPI.allCompanies('TASI').then(function(r){sCompList(r.results||[])}).catch(function(){})},[]);
+  useEffect(function(){Promise.all([StockAPI.allCompanies('TASI').catch(function(){return{results:[]}}),StockAPI.allCompanies('nomu').catch(function(){return{results:[]}})]).then(function(r){sCompList((r[0].results||[]).concat(r[1].results||[]))})},[]);
   var _2=s(null),data=_2[0],sData=_2[1];
   var _3=s(false),ld=_3[0],sLd=_3[1];
   var _4=s('1d'),tf=_4[0],sTf=_4[1];
@@ -650,6 +650,8 @@ function ChartPage({initSym}){
     chartInst.current=chart;
 
     var raw=hist.map(function(d){return{time:d.date||d.timestamp,open:+d.open,high:+d.high,low:+d.low,close:+d.close,volume:+d.volume||0}}).filter(function(d){return d.time&&d.open}).sort(function(a,b){return a.time<b.time?-1:1});
+    // Add today's live candle from quote
+    if(quote&&quote.price){var td=new Date().toISOString().slice(0,10);if(!raw.length||raw[raw.length-1].time!==td){raw.push({time:td,open:+quote.open||+quote.price,high:+quote.high||+quote.price,low:+quote.low||+quote.price,close:+quote.price,volume:+quote.volume||0})}else{var last=raw[raw.length-1];last.close=+quote.price;if(+quote.high>last.high)last.high=+quote.high;if(+quote.low<last.low)last.low=+quote.low;last.volume=+quote.volume||last.volume}}
     if(!raw.length)return;
 
     // Real OHLC candles (actual prices)
